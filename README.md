@@ -8,13 +8,15 @@
 
 # 🏠 Overview
 
-Build an unstructured data extraction system using a provided document corpus. You have **full autonomy** over the technology stack and implementation approach. 🧪
+If we have given you this assignment it means that we are highly interested in having you work with us!!
 
-We **heavily encourage** the use of bleeding-edge coding agents to develop the app — we want to review your *process* and your *understanding* of the system that gets generated. 🤖✨
+The assignment is to build an unstructured data extraction system using a provided document corpus. You have **full autonomy** over the technology stack and implementation approach. 🧪
+
+We **heavily encourage** the use of bleeding-edge coding agents to develop the app — we want to review your *process* and your *understanding* of the system that gets generated. Please show your work as you go with commits as you refine the project. 🤖✨
 
 ## ⏱️ Timeline
 
-- 📅 **Deadline:** 7 days from receipt
+- 📅 **Deadline:** determined by your recruiter
 - ⚡ **Expected effort:** 4–8 hours
 
 ## 🧩 Problem Description
@@ -65,11 +67,11 @@ Fork this repository and submit your git repository containing all deliverables.
 
 ## 🎯 Next Steps
 
-After submission, you can expect to participate in **three 45-minute** follow-up sessions:
+After submission, you can expect to participate in a follow-up session(s) covering:
 
-- 🧰 **Development Tooling Approach** — discussion of development environment and tooling approaches
+- 🧰 **Development Tooling Approach** — discussion of development environment and agent/tooling approaches
 - 🏛️ **Systems Design Session** — walkthrough of design decisions and discussion of potential extensions
-- 🔬 **Code Review Session** — review of implementation details and technical choices
+- 🔬 **Code Review Session** — a high level review of implementation and technical choices
 
 ## 💬 Questions
 
