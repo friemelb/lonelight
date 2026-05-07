@@ -12,7 +12,7 @@ If we have given you this assignment it means that we are highly interested in h
 
 The assignment is to build an unstructured data extraction system using a provided document corpus. You have **full autonomy** over the technology stack and implementation approach. 🧪
 
-We **heavily encourage** the use of bleeding-edge coding agents to develop the app — we want to review your *process* and your *understanding* of the system that gets generated. Please show your work as you go with commits as you refine the project. 🤖✨
+We **heavily encourage** the use of bleeding-edge coding agents to develop the app — we want to review your *process* and your *understanding* of the system that gets generated. Include any agent files you used, coding agent extensions, etc. Please show your work as you go with commits as you refine the project. 🤖✨
 
 ## ⏱️ Timeline
 
