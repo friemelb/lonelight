@@ -20,7 +20,8 @@
     "test:web": "npm run test --workspace=apps/web",
     "test:domain": "npm run test --workspace=packages/domain",
     "type-check": "npm run type-check --workspaces",
-    "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist packages/*/node_modules packages/*/dist"
+    "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist packages/*/node_modules packages/*/dist",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -33,5 +34,8 @@
     "llm"
   ],
   "author": "",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
 }

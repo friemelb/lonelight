@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import {
   ExtractedFieldSchema,
-  StringExtractedFieldSchema,
-  NumberExtractedFieldSchema,
-  BooleanExtractedFieldSchema
+  StringExtractedFieldSchema
 } from './common.schemas';
 import { IncomeHistoryItemSchema } from './income.schemas';
 
