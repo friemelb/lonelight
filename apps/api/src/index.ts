@@ -2,7 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from '@/config';
+import { getDatabase, closeDatabase } from '@/database';
 import { healthRouter } from '@/routes/health';
+import { documentsRouter } from '@/routes/documents';
+import { borrowersRouter } from '@/routes/borrowers';
 import { errorHandler } from '@/middleware/errorHandler';
 import { requestLogger } from '@/middleware/requestLogger';
 
@@ -24,9 +27,15 @@ app.use(requestLogger);
 
 // API routes
 app.use('/api/health', healthRouter);
+app.use('/api/documents', documentsRouter);
+app.use('/api/borrowers', borrowersRouter);
 
 // Error handling (must be last)
 app.use(errorHandler);
+
+// Initialize database
+console.log('🔌 Initializing database...');
+getDatabase();
 
 // Start server
 const server = app.listen(config.port, config.host, () => {
@@ -40,6 +49,8 @@ process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
   server.close(() => {
     console.log('HTTP server closed');
+    closeDatabase();
+    console.log('Database connection closed');
   });
 });
 

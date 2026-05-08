@@ -13,5 +13,9 @@ export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   host: process.env.HOST || 'localhost',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  apiVersion: process.env.API_VERSION || 'v1'
+  apiVersion: process.env.API_VERSION || 'v1',
+
+  // Database configuration
+  databasePath: process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'loanlens.db'),
+  databaseVerbose: process.env.DATABASE_VERBOSE === 'true'
 } as const;
