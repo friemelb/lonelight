@@ -1,10 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { getDatabase } from '@/database';
 import { DocumentRepository } from '@/repositories';
 import { FileService } from '@/services/FileService';
 import { ProcessingStatus, DocumentRecord } from '@loanlens/domain';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const ingestRouter = Router();
 
