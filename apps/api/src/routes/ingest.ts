@@ -3,8 +3,9 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDatabase } from '@/database';
-import { DocumentRepository } from '@/repositories';
+import { DocumentRepository, ChunkRepository } from '@/repositories';
 import { FileService } from '@/services/FileService';
+import { ParsingService } from '@/services/ParsingService';
 import { ProcessingStatus, DocumentRecord } from '@loanlens/domain';
 
 // Get __dirname equivalent in ES modules
@@ -17,6 +18,9 @@ interface IngestResponse {
   total: number;
   successful: number;
   failed: number;
+  parsed: number;
+  parseFailed: number;
+  totalChunks: number;
   documents: DocumentRecord[];
   errors: Array<{ filename: string; error: string }>;
 }
@@ -121,11 +125,100 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
       }
     }
 
+    // NEW: Parse and chunk successfully ingested documents
+    const parsingService = new ParsingService();
+    const chunkRepository = new ChunkRepository(db);
+
+    let parsedCount = 0;
+    let parseFailedCount = 0;
+    let totalChunks = 0;
+
+    for (const doc of documents) {
+      // Only parse documents that were successfully ingested (UPLOADED status)
+      if (doc.status !== ProcessingStatus.UPLOADED) {
+        continue;
+      }
+
+      try {
+        console.log(`Parsing document: ${doc.filename}`);
+
+        // Update status to PROCESSING
+        await documentRepository.updateStatus(doc.id, ProcessingStatus.PROCESSING);
+
+        // Parse and chunk the document
+        const parseResult = await parsingService.parseAndChunkDocument(doc);
+
+        if (parseResult.success && parseResult.chunks.length > 0) {
+          // Save chunks to database
+          await chunkRepository.createMany(parseResult.chunks);
+
+          console.log(`Created ${parseResult.chunks.length} chunks for ${doc.filename}`);
+
+          // Update document status to EXTRACTED
+          await documentRepository.updateStatus(doc.id, ProcessingStatus.EXTRACTED);
+
+          // Update document with page count
+          await documentRepository.update(doc.id, {
+            pageCount: parseResult.chunks.length
+          });
+
+          // Update the document object in memory (for response)
+          doc.status = ProcessingStatus.EXTRACTED;
+          doc.pageCount = parseResult.chunks.length;
+
+          parsedCount++;
+          totalChunks += parseResult.chunks.length;
+        } else {
+          // Parsing failed
+          const errorMsg = parseResult.error || 'Failed to parse document';
+          await documentRepository.updateStatus(
+            doc.id,
+            ProcessingStatus.FAILED,
+            errorMsg
+          );
+
+          // Update the document object in memory
+          doc.status = ProcessingStatus.FAILED;
+          doc.errorMessage = errorMsg;
+
+          parseFailedCount++;
+          errors.push({
+            filename: doc.filename,
+            error: errorMsg
+          });
+        }
+      } catch (error) {
+        // Handle unexpected errors
+        const errorMsg = error instanceof Error ? error.message : 'Unknown parsing error';
+        console.error(`Error parsing document ${doc.filename}:`, errorMsg);
+
+        await documentRepository.updateStatus(
+          doc.id,
+          ProcessingStatus.FAILED,
+          errorMsg
+        );
+
+        doc.status = ProcessingStatus.FAILED;
+        doc.errorMessage = errorMsg;
+
+        parseFailedCount++;
+        errors.push({
+          filename: doc.filename,
+          error: errorMsg
+        });
+      }
+    }
+
+    console.log(`Parsing complete: ${parsedCount} parsed, ${parseFailedCount} failed, ${totalChunks} total chunks`);
+
     // Return response
     const response: IngestResponse = {
       total: files.length,
       successful,
       failed,
+      parsed: parsedCount,
+      parseFailed: parseFailedCount,
+      totalChunks,
       documents,
       errors
     };

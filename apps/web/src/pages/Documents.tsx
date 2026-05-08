@@ -26,10 +26,11 @@ import {
   Button,
   Grid
 } from '@mui/material';
-import { Refresh, Visibility, CloudUpload } from '@mui/icons-material';
+import { Refresh, Visibility, CloudUpload, ViewModule } from '@mui/icons-material';
 import { ProcessingStatus } from '@loanlens/domain';
 import { useDocumentStore } from '../store/documentStore';
 import { StatusChip } from '../components/StatusChip';
+import { ChunkViewer } from '../components/ChunkViewer';
 
 export function Documents() {
   const {
@@ -55,6 +56,8 @@ export function Documents() {
     failed: number;
     errors: Array<{filename: string; error: string}>;
   } | null>(null);
+  const [chunkViewerOpen, setChunkViewerOpen] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
 
   // Initial fetch
   useEffect(() => {
@@ -106,6 +109,12 @@ export function Documents() {
   const handleRowClick = (doc: any) => {
     setSelectedDoc(doc);
     setDialogOpen(true);
+  };
+
+  // Handle viewing chunks
+  const handleViewChunks = (documentId: string) => {
+    setSelectedDocumentId(documentId);
+    setChunkViewerOpen(true);
   };
 
   // Format file size
@@ -168,6 +177,7 @@ export function Documents() {
               <TableCell align="right">Size</TableCell>
               <TableCell>Uploaded</TableCell>
               <TableCell>Pages</TableCell>
+              <TableCell align="right">Chunks</TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -181,12 +191,13 @@ export function Documents() {
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton width={50} /></TableCell>
+                  <TableCell><Skeleton width={50} /></TableCell>
                   <TableCell><Skeleton /></TableCell>
                 </TableRow>
               ))
             ) : documents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                     No documents found
                   </Typography>
@@ -217,6 +228,9 @@ export function Documents() {
                   <TableCell>
                     {doc.pageCount || '—'}
                   </TableCell>
+                  <TableCell align="right">
+                    {doc.pageCount ? '—' : '—'}
+                  </TableCell>
                   <TableCell align="center">
                     <Tooltip title="View details">
                       <IconButton size="small" onClick={(e) => {
@@ -224,6 +238,18 @@ export function Documents() {
                         handleRowClick(doc);
                       }}>
                         <Visibility fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="View chunks">
+                      <IconButton
+                        size="small"
+                        disabled={!doc.pageCount || doc.pageCount === 0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewChunks(doc.id);
+                        }}
+                      >
+                        <ViewModule fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   </TableCell>
@@ -406,6 +432,16 @@ export function Documents() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Chunk Viewer Dialog */}
+      <ChunkViewer
+        open={chunkViewerOpen}
+        documentId={selectedDocumentId || ''}
+        onClose={() => {
+          setChunkViewerOpen(false);
+          setSelectedDocumentId(null);
+        }}
+      />
     </Box>
   );
 }
