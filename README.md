@@ -1,82 +1,218 @@
+# LoanLens - Intelligent Document Extraction System
+
+LoanLens is an AI-powered document extraction system designed to process unstructured loan documents and extract structured borrower information. The system handles variable-format documents (PDFs, images, scanned documents) and extracts key data points including personal identifying information (PII), income history, account numbers, and maintains full traceability to source documents.
+
+## Tech Stack
+
+### Backend
+- **Runtime**: Node.js 18+
+- **Framework**: Express.js
+- **Language**: TypeScript (strict mode)
+- **Testing**: Vitest
+
+### Frontend
+- **Framework**: React 18
+- **Build Tool**: Vite
+- **UI Library**: Material UI (MUI)
+- **State Management**: Zustand
+- **Routing**: React Router
+- **Language**: TypeScript (strict mode)
+- **Testing**: Vitest
+
+### Infrastructure
+- **Monorepo**: npm workspaces
+- **Package Manager**: npm 9+
+
+## Project Structure
+
 ```
- _                          __  __           _
-| |    ___   __ _ _ __     |  \/  | __ _ ___| |_ ___ _ __
-| |   / _ \ / _` | '_ \    | |\/| |/ _` / __| __/ _ \ '__|
-| |__| (_) | (_| | | | |   | |  | | (_| \__ \ ||  __/ |
-|_____\___/ \__,_|_| |_|   |_|  |_|\__,_|___/\__\___|_|
+lonelight/
+├── apps/
+│   ├── api/              # Express backend API
+│   │   ├── src/
+│   │   │   ├── config/   # Configuration
+│   │   │   ├── middleware/ # Express middleware
+│   │   │   ├── routes/   # API routes
+│   │   │   └── index.ts  # Entry point
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── vitest.config.ts
+│   └── web/              # React frontend SPA
+│       ├── src/
+│       │   ├── components/ # React components
+│       │   ├── pages/    # Page components
+│       │   ├── store/    # Zustand stores
+│       │   ├── theme/    # Material UI theme
+│       │   ├── test/     # Test utilities
+│       │   ├── App.tsx
+│       │   └── main.tsx
+│       ├── index.html
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── vite.config.ts
+├── Loan Documents/       # Sample document corpus
+├── agent-work/           # Development notes and prompts
+├── .claude/              # AI agent configuration
+├── package.json          # Root package.json with workspaces
+└── README.md
 ```
 
-# 🏠 Overview
+## Getting Started
 
-If we have given you this assignment it means that we are highly interested in having you work with us!!
+### Prerequisites
+- Node.js 18+
+- npm 9+
 
-The assignment is to build an unstructured data extraction system using a provided document corpus. You have **full autonomy** over the technology stack and implementation approach. 🧪
+### Installation
 
-We **heavily encourage** the use of bleeding-edge coding agents to develop the app — we want to review your *process* and your *understanding* of the system that gets generated. Include any agent files you used, coding agent extensions, etc. Please show your work as you go with commits as you refine the project. 🤖✨
+1. Clone the repository
+```bash
+git clone <repository-url>
+cd lonelight
+```
 
-## ⏱️ Timeline
+2. Install dependencies
+```bash
+npm install
+```
 
-- 📅 **Deadline:** determined by your recruiter
-- ⚡ **Expected effort:** 4–8 hours
+3. Set up environment variables
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+```
 
-## 🧩 Problem Description
+### Development
 
-The provided folder contains a corpus of documents with variable formatting, mixed file types, and structured data embedded within unstructured text. 📚 The goal is to design and implement a system that extracts meaningful, structured data from these documents.
+Start both API and web dev servers:
+```bash
+npm run dev
+```
 
-Your solution should include logic for parsing unstructured data **and** an API or interface to serve the processed data in a meaningful form. 🔌
+This will start:
+- API server at http://localhost:3001
+- Web app at http://localhost:5173
 
-### 📄 Loan Documents
+Or run them individually:
+```bash
+npm run dev:api  # Start API only
+npm run dev:web  # Start web only
+```
 
-Analyze the documents and produce a structured record for each borrower that includes extracted PII like:
+### Building
 
-- 👤 Name
-- 🏡 Address
-- 💰 Full income history
-- 🔢 Associated account / loan numbers
+Build all workspaces:
+```bash
+npm run build
+```
 
-…with a clear reference 🔗 to the original document(s) from which each piece of information was sourced.
+Or build individually:
+```bash
+npm run build:api  # Build API
+npm run build:web  # Build web
+```
 
-## 📦 Deliverables
+### Testing
 
-### 1. 🏗️ System Design Document (Markdown)
+Run all tests:
+```bash
+npm test
+```
 
-- 🗺️ Architecture overview, including component diagram
-- 🔄 Data pipeline design covering ingestion, processing, storage, and retrieval
-- 🧠 AI / LLM integration strategy and model selection rationale
-- 🎨 Approach for handling document format variability
-- 📈 Scaling considerations for **10x** and **100x** document volume
-- ⚖️ Key technical trade-offs and reasoning
-- 🛡️ Error handling strategy and data quality validation approach
+Or test individually:
+```bash
+npm run test:api  # Test API
+npm run test:web  # Test web
+```
 
-### 2. 🛠️ Working Implementation
+Type checking:
+```bash
+npm run type-check
+```
 
-- 📥 Document ingestion pipeline
-- 🤖 Extraction logic using AI / LLM tooling
-- 🗂️ Structured output generation (e.g., JSON or database-backed)
-- 🔍 Basic query or retrieval interface
-- ✅ Test coverage for critical paths (encouraged but not required)
+### Cleanup
 
-### 3. 📖 README
+Remove all dependencies and build artifacts:
+```bash
+npm run clean
+```
 
-- 🏁 Setup and run instructions
-- 💡 Summary of architectural and implementation decisions
+## API Endpoints
 
-## 🚀 Submission Instructions
+### Health Check
+```
+GET /api/health
+```
+Returns API status and metadata.
 
-Fork this repository and submit your git repository containing all deliverables. Email a link to the repo upon completion. 📧
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "uptime": 123.45,
+  "service": "loanlens-api",
+  "version": "0.1.0"
+}
+```
 
-## 🎯 Next Steps
+## Features
 
-After submission, you can expect to participate in a follow-up session(s) covering:
+### Current (v0.1.0)
+- Monorepo structure with npm workspaces
+- Backend API with health check endpoint
+- Frontend with Material UI app shell
+- Left navigation drawer (Dashboard, Documents, Borrowers)
+- Dashboard displays API health status
+- Zustand state management
+- Vitest testing setup
+- TypeScript strict mode
 
-- 🧰 **Development Tooling Approach** — discussion of development environment and agent/tooling approaches
-- 🏛️ **Systems Design Session** — walkthrough of design decisions and discussion of potential extensions
-- 🔬 **Code Review Session** — a high level review of implementation and technical choices
+### Planned
+- Document upload and management
+- AI/LLM-based extraction pipeline
+- Structured data extraction (PII, income, accounts)
+- Source traceability and confidence scoring
+- Data visualization and export
+- Advanced search and filtering
 
-## 💬 Questions
+## Architecture
 
-We encourage you to reach out with any questions. 🙋 Scope clarification is available, but implementation decisions are intentionally left open-ended. 🎨
+### Data Flow Pipeline (Planned)
+1. **Ingestion**: Document upload via multipart/form-data
+2. **Preprocessing**: Format detection, OCR for images, text extraction
+3. **Extraction**: LLM-based structured data extraction
+4. **Validation**: Confidence scoring, data quality checks
+5. **Storage**: Persist documents, extracted data, and source references
+6. **Retrieval**: API endpoints for querying extracted data
 
----
+### Scaling Considerations
+- **10x Scale**: Queue-based processing, horizontal API scaling, caching
+- **100x Scale**: Microservices, object storage, distributed caching, auto-scaling
 
-*Good luck, and have fun building, we appreciate your time and interest.* 🍀
+## Development
+
+### Coding Standards
+- TypeScript strict mode, no `any` types
+- Functional React components with hooks
+- Material UI theme-based styling
+- Comprehensive error handling
+- Structured logging
+- Test critical paths
+
+### Multi-Agent Workflow
+This project uses Claude Code's multi-agent system:
+- **/designer**: UI/UX design, Material UI components
+- **/architect**: System design, technology choices, scaling
+- **/senior-dev**: Implementation, coding, LLM integration
+- **/qa-eng**: Test planning, quality assurance
+
+See `.claude/CLAUDE.md` for detailed project context.
+
+## License
+
+UNLICENSED - Private repository
+
+## Questions
+
+For questions or clarifications, please reach out to the project maintainer.

@@ -1,0 +1,34 @@
+{
+  "name": "loanlens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Intelligent document extraction system for loan documents",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:api & npm run dev:web",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspaces",
+    "build:api": "npm run build --workspace=apps/api",
+    "build:web": "npm run build --workspace=apps/web",
+    "test": "npm run test --workspaces",
+    "test:api": "npm run test --workspace=apps/api",
+    "test:web": "npm run test --workspace=apps/web",
+    "type-check": "npm run type-check --workspaces",
+    "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "document-extraction",
+    "loan-processing",
+    "ai",
+    "llm"
+  ],
+  "author": "",
+  "license": "UNLICENSED"
+}
