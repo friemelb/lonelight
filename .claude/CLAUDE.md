@@ -12,6 +12,7 @@ LoanLens is an intelligent document extraction system designed to process unstru
 - **Runtime**: Node.js 18+
 - **Framework**: Express.js
 - **Language**: TypeScript (strict mode)
+- **Database**: SQLite (better-sqlite3)
 - **Testing**: Vitest
 - **Document Processing**: [To be determined - PDF.js, Tesseract OCR, etc.]
 - **AI/LLM**: [To be determined - OpenAI, Anthropic, AWS Textract, etc.]
@@ -55,17 +56,19 @@ lonelight/
 ```
 
 ### Data Flow Pipeline
-1. **Ingestion**: Document upload via multipart/form-data
-2. **Preprocessing**: Format detection, OCR for images, text extraction
-3. **Extraction**: LLM-based structured data extraction with prompts
+1. **Ingestion**: Document upload via multipart/form-data (planned)
+2. **Preprocessing**: Format detection, OCR for images, text extraction (planned)
+3. **Extraction**: LLM-based structured data extraction with prompts (planned)
 4. **Validation**: Confidence scoring, data quality checks
-5. **Storage**: Persist documents, extracted data, and source references
-6. **Retrieval**: API endpoints for querying extracted data
+5. **Storage**: Persist documents, extracted data, and source references via SQLite repositories
+6. **Retrieval**: RESTful API endpoints for querying extracted data
 
 ### API-Driven Architecture
-- RESTful API for all document operations
-- Async processing for long-running extractions
-- WebSocket/polling for status updates
+- RESTful API for all document and borrower operations
+- Repository pattern for data access abstraction
+- SQLite persistence with transaction support
+- Async processing for long-running extractions (planned)
+- WebSocket/polling for status updates (planned)
 - Comprehensive error handling and retry logic
 
 ## Domain Context
@@ -225,9 +228,12 @@ npm run clean            # Remove all node_modules and dist folders
 
 ### Backend Patterns
 - **Middleware**: Use Express middleware for cross-cutting concerns
-- **Repository Pattern**: Abstract data access layer
-- **Service Layer**: Business logic separate from controllers
-- **Dependency Injection**: Pass dependencies explicitly
+- **Repository Pattern**: Abstract data access layer (implemented with SQLite)
+  - DocumentRepository, ChunkRepository, BorrowerRepository, ErrorRepository
+  - Interface-based design for testability and future database migration
+  - Transaction support for multi-table operations
+- **Service Layer**: Business logic separate from controllers (future)
+- **Dependency Injection**: Pass dependencies explicitly (repositories injected with DB instance)
 
 ## PII Data Handling
 
@@ -284,7 +290,7 @@ npm run clean            # Remove all node_modules and dist folders
 
 ## Project Status
 
-**Current Phase**: Domain models complete ✅
+**Current Phase**: SQLite persistence complete ✅
 
 **Completed**:
 
@@ -317,22 +323,52 @@ npm run clean            # Remove all node_modules and dist folders
 - TypeScript path aliases configured for clean imports
 - Agent work documentation (agent-work/prompts/02-domain-models.md)
 
+*Phase 3: SQLite Persistence* ✅
+- Installed better-sqlite3 (v12.9.0) for fast, synchronous database operations
+- Database connection management with singleton pattern and graceful shutdown
+- 5-table schema with foreign key constraints:
+  - `documents`: Document metadata and processing status
+  - `document_chunks`: Parsed text segments with page references
+  - `borrowers`: Basic borrower information
+  - `borrower_fields`: ExtractedField storage using EAV pattern
+  - `processing_errors`: Error tracking and diagnostics
+- Repository pattern implementation with interfaces:
+  - DocumentRepository: CRUD, filtering, pagination, status updates
+  - ChunkRepository: chunk management, content search
+  - BorrowerRepository: ExtractedField normalization for source traceability
+  - ErrorRepository: error tracking and resolution
+- RESTful API routes:
+  - GET /api/documents (list, filter by status/borrowerId, paginate)
+  - GET /api/documents/:id
+  - GET /api/documents/:id/chunks
+  - GET /api/borrowers (list, search, paginate)
+  - GET /api/borrowers/:id
+  - GET /api/borrowers/:id/documents
+- Comprehensive test coverage:
+  - Repository unit tests (11 tests)
+  - Route integration tests (21 tests)
+  - All 36 API tests passing, 97 total tests across monorepo
+- Database initialization on API startup with graceful shutdown
+- Configuration via DATABASE_PATH and DATABASE_VERBOSE environment variables
+- Agent work documentation (agent-work/prompts/03-sqlite.md)
+
 **Current Status**:
-- All core infrastructure and domain models in place
+- Full-stack infrastructure complete with persistence layer
 - Type-safe, validated data structures across monorepo
+- RESTful API with database backing for documents and borrowers
 - Apps are locally runnable with `npm run dev`
-- All tests pass (API: 4, Web: 2, Domain: 57)
-- Ready for LLM integration and document processing
+- All 97 tests passing (API: 36, Web: 2, Domain: 59)
+- Ready for document upload and LLM integration
 
 **Next Steps**:
-1. Install dependencies and verify tests (`npm install && npm test`)
+1. Implement document upload UI and multipart/form-data API endpoint
 2. Choose and integrate LLM provider (Anthropic Claude or OpenAI)
-3. Implement document upload UI and API endpoint
-4. Build document processing pipeline (PDF parsing, OCR)
-5. Create extraction prompt templates using domain schemas
-6. Implement extraction result storage and retrieval
-7. Build data visualization in Dashboard
-8. Add borrower aggregation logic
+3. Build document processing pipeline (PDF parsing, OCR)
+4. Create extraction prompt templates using domain schemas
+5. Implement extraction service that populates borrower data
+6. Build data visualization in Dashboard
+7. Add document viewer with highlighted extractions
+8. Implement data export functionality (JSON, CSV)
 9. Expand E2E test coverage
 10. Write system design document
 

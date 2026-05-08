@@ -8,6 +8,7 @@ LoanLens is an AI-powered document extraction system designed to process unstruc
 - **Runtime**: Node.js 18+
 - **Framework**: Express.js
 - **Language**: TypeScript (strict mode)
+- **Database**: SQLite (better-sqlite3)
 - **Testing**: Vitest
 
 ### Frontend
@@ -31,7 +32,9 @@ lonelight/
 │   ├── api/              # Express backend API
 │   │   ├── src/
 │   │   │   ├── config/   # Configuration
+│   │   │   ├── database/ # SQLite connection and schema
 │   │   │   ├── middleware/ # Express middleware
+│   │   │   ├── repositories/ # Data access layer
 │   │   │   ├── routes/   # API routes
 │   │   │   └── index.ts  # Entry point
 │   │   ├── package.json
@@ -156,16 +159,49 @@ Returns API status and metadata.
 }
 ```
 
+### Documents
+```
+GET /api/documents              # List documents with filtering and pagination
+GET /api/documents/:id          # Get single document by ID
+GET /api/documents/:id/chunks   # Get all chunks for a document
+```
+
+**Query Parameters:**
+- `limit`: Number of results (default: 50)
+- `offset`: Pagination offset (default: 0)
+- `status`: Filter by processing status (UPLOADED, QUEUED, PROCESSING, EXTRACTED, ANALYZING, COMPLETED, FAILED, ERROR)
+- `borrowerId`: Filter by borrower ID
+
+### Borrowers
+```
+GET /api/borrowers                # List borrowers with search and pagination
+GET /api/borrowers/:id            # Get single borrower with all extracted fields
+GET /api/borrowers/:id/documents  # Get all documents for a borrower
+```
+
+**Query Parameters:**
+- `limit`: Number of results (default: 50)
+- `offset`: Pagination offset (default: 0)
+- `search`: Search across borrower fields (name, email, phone, etc.)
+
 ## Features
 
 ### Current (v0.1.0)
 - Monorepo structure with npm workspaces
 - Backend API with health check endpoint
+- **SQLite persistence layer with Repository pattern**
+  - DocumentRepository, ChunkRepository, BorrowerRepository, ErrorRepository
+  - 5-table schema with foreign key constraints
+  - ExtractedField normalization using EAV pattern for source traceability
+  - In-memory testing with isolated test databases
+- **RESTful API endpoints for documents and borrowers**
+  - List, filter, paginate, and search functionality
+  - 36 passing API tests (11 repository + 21 route integration + 4 health)
 - Frontend with Material UI app shell
 - Left navigation drawer (Dashboard, Documents, Borrowers)
 - Dashboard displays API health status
 - Zustand state management
-- Vitest testing setup
+- Comprehensive testing setup (97 total tests passing)
 - TypeScript strict mode
 
 ### Planned
@@ -178,17 +214,29 @@ Returns API status and metadata.
 
 ## Architecture
 
-### Data Flow Pipeline (Planned)
-1. **Ingestion**: Document upload via multipart/form-data
-2. **Preprocessing**: Format detection, OCR for images, text extraction
-3. **Extraction**: LLM-based structured data extraction
+### Data Persistence
+- **Database**: SQLite (better-sqlite3) for fast, synchronous operations
+- **Schema**: 5 tables with foreign key constraints
+  - `documents`: Document metadata and processing status
+  - `document_chunks`: Parsed text segments with page references
+  - `borrowers`: Basic borrower information
+  - `borrower_fields`: ExtractedField storage (EAV pattern) for source traceability
+  - `processing_errors`: Error tracking and diagnostics
+- **Repository Pattern**: Abstract data access with interfaces for testability
+- **Transactions**: Multi-table operations wrapped in transactions for atomicity
+
+### Data Flow Pipeline
+1. **Ingestion**: Document upload via multipart/form-data (planned)
+2. **Preprocessing**: Format detection, OCR for images, text extraction (planned)
+3. **Extraction**: LLM-based structured data extraction (planned)
 4. **Validation**: Confidence scoring, data quality checks
-5. **Storage**: Persist documents, extracted data, and source references
-6. **Retrieval**: API endpoints for querying extracted data
+5. **Storage**: Persist documents, extracted data, and source references via repositories
+6. **Retrieval**: RESTful API endpoints for querying extracted data
 
 ### Scaling Considerations
-- **10x Scale**: Queue-based processing, horizontal API scaling, caching
-- **100x Scale**: Microservices, object storage, distributed caching, auto-scaling
+- **Current**: Single SQLite database, suitable for 1-100K documents
+- **10x Scale**: Queue-based processing, horizontal API scaling, caching, PostgreSQL migration
+- **100x Scale**: Microservices, object storage (S3), distributed caching (Redis), auto-scaling
 
 ## Development
 
