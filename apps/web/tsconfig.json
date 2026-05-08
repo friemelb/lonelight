@@ -17,7 +17,9 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@loanlens/domain": ["../../packages/domain/src"],
+      "@loanlens/domain/*": ["../../packages/domain/src/*"]
     }
   },
   "include": ["src"],

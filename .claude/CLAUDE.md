@@ -29,6 +29,15 @@ LoanLens is an intelligent document extraction system designed to process unstru
 - **Monorepo**: npm workspaces
 - **Package Manager**: npm 9+
 - **Version Control**: Git (GitHub)
+- **Validation**: Zod runtime type validation
+
+### Shared Packages
+- **@loanlens/domain**: Shared TypeScript types and Zod schemas
+  - DocumentRecord, DocumentChunk types
+  - BorrowerRecord, ExtractedField types
+  - IncomeHistoryItem types
+  - ProcessingStatus enums
+  - Validation schemas and helpers
 
 ## Architecture Pattern
 
@@ -38,7 +47,8 @@ lonelight/
 ├── apps/
 │   ├── api/              # Express backend API
 │   └── web/              # React frontend SPA
-├── packages/             # Shared code (future)
+├── packages/
+│   └── domain/           # Shared TypeScript types and Zod schemas
 ├── Loan Documents/       # Sample document corpus
 ├── agent-work/           # Development notes and prompts
 └── .claude/              # AI agent configuration
@@ -188,11 +198,15 @@ npm run dev:web          # Start web only (http://localhost:5173)
 npm run build            # Build all workspaces
 npm run build:api        # Build API
 npm run build:web        # Build web
+npm run build:domain     # Build domain package
 ```
 
 ### Testing
 ```bash
 npm test                 # Run all tests
+npm run test:api         # Run API tests
+npm run test:web         # Run web tests
+npm run test:domain      # Run domain tests (57 test cases)
 npm run type-check       # TypeScript type checking
 ```
 
@@ -233,11 +247,13 @@ npm run clean            # Remove all node_modules and dist folders
 ## Common Tasks
 
 ### Adding a New Extraction Field
-1. Update database schema (if applicable)
-2. Update extraction prompts/logic in backend
-3. Update API response types
-4. Update frontend display components
-5. Update tests for new field
+1. Update domain models in `packages/domain/src/types/`
+2. Update Zod schemas in `packages/domain/src/schemas/`
+3. Add validation tests in `packages/domain/test/`
+4. Update database schema (if applicable)
+5. Update extraction prompts/logic in backend
+6. Update frontend display components
+7. Update tests for new field
 
 ### Adding a New Document Type
 1. Add format detection logic
@@ -268,9 +284,11 @@ npm run clean            # Remove all node_modules and dist folders
 
 ## Project Status
 
-**Current Phase**: Monorepo scaffolding complete ✅
+**Current Phase**: Domain models complete ✅
 
 **Completed**:
+
+*Phase 1: Monorepo Scaffolding* ✅
 - Repository setup and git configuration
 - Monorepo structure with npm workspaces
 - Multi-agent system configuration (Designer, Architect, Senior Dev, QA Eng)
@@ -287,22 +305,36 @@ npm run clean            # Remove all node_modules and dist folders
 - Comprehensive README with setup instructions
 - Agent work documentation (agent-work/prompts/01-scaffold.md)
 
+*Phase 2: Domain Models* ✅
+- Created `packages/domain` shared package
+- Core domain types: ExtractedField<T>, BorrowerRecord, DocumentRecord, DocumentChunk, IncomeHistoryItem
+- Zod validation schemas for all domain models
+- ExtractedField enforces source traceability (sourceDocumentId, sourcePage, evidenceQuote)
+- Confidence scoring on all extracted data (0-1 scale)
+- Comprehensive validation error messages
+- 57 test cases across 3 test files (extracted-field, borrower, document)
+- Integrated with apps/api and apps/web via workspace dependencies
+- TypeScript path aliases configured for clean imports
+- Agent work documentation (agent-work/prompts/02-domain-models.md)
+
 **Current Status**:
-- All core infrastructure is in place
+- All core infrastructure and domain models in place
+- Type-safe, validated data structures across monorepo
 - Apps are locally runnable with `npm run dev`
-- Basic tests pass for health endpoint and App component
-- Ready for LLM integration phase
+- All tests pass (API: 4, Web: 2, Domain: 57)
+- Ready for LLM integration and document processing
 
 **Next Steps**:
-1. Choose and integrate LLM provider (Anthropic Claude or OpenAI)
-2. Implement document upload UI and API endpoint
-3. Build document processing pipeline (PDF parsing, OCR)
-4. Create extraction prompt templates
-5. Implement extraction result storage and retrieval
-6. Build data visualization in Dashboard
-7. Add borrower aggregation logic
-8. Expand test coverage
-9. Write system design document
+1. Install dependencies and verify tests (`npm install && npm test`)
+2. Choose and integrate LLM provider (Anthropic Claude or OpenAI)
+3. Implement document upload UI and API endpoint
+4. Build document processing pipeline (PDF parsing, OCR)
+5. Create extraction prompt templates using domain schemas
+6. Implement extraction result storage and retrieval
+7. Build data visualization in Dashboard
+8. Add borrower aggregation logic
+9. Expand E2E test coverage
+10. Write system design document
 
 ## References
 

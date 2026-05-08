@@ -4,7 +4,8 @@
   "private": true,
   "description": "Intelligent document extraction system for loan documents",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev:api & npm run dev:web",
@@ -13,11 +14,13 @@
     "build": "npm run build --workspaces",
     "build:api": "npm run build --workspace=apps/api",
     "build:web": "npm run build --workspace=apps/web",
+    "build:domain": "npm run build --workspace=packages/domain",
     "test": "npm run test --workspaces",
     "test:api": "npm run test --workspace=apps/api",
     "test:web": "npm run test --workspace=apps/web",
+    "test:domain": "npm run test --workspace=packages/domain",
     "type-check": "npm run type-check --workspaces",
-    "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist"
+    "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist packages/*/node_modules packages/*/dist"
   },
   "engines": {
     "node": ">=18.0.0",
