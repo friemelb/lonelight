@@ -6,6 +6,7 @@ import { getDatabase, closeDatabase } from '@/database';
 import { healthRouter } from '@/routes/health';
 import { documentsRouter } from '@/routes/documents';
 import { borrowersRouter } from '@/routes/borrowers';
+import { ingestRouter } from '@/routes/ingest';
 import { errorHandler } from '@/middleware/errorHandler';
 import { requestLogger } from '@/middleware/requestLogger';
 
@@ -29,6 +30,7 @@ app.use(requestLogger);
 app.use('/api/health', healthRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/borrowers', borrowersRouter);
+app.use('/api/ingest', ingestRouter);
 
 // Error handling (must be last)
 app.use(errorHandler);

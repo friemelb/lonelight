@@ -28,6 +28,12 @@ interface DocumentStore {
   setFilters: (filters: DocumentFilters) => void;
   resetFilters: () => void;
   clearError: () => void;
+  ingestDocuments: () => Promise<{
+    total: number;
+    successful: number;
+    failed: number;
+    errors: Array<{filename: string; error: string}>;
+  }>;
 }
 
 export const useDocumentStore = create<DocumentStore>((set, get) => ({
@@ -139,5 +145,32 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   // Clear error message
   clearError: () => {
     set({ error: null });
+  },
+
+  // Ingest documents from corpus
+  ingestDocuments: async () => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch('/api/ingest', { method: 'POST' });
+
+      if (!response.ok) {
+        throw new Error(`Ingestion failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Refresh documents list after ingestion
+      await get().fetchDocuments({}, 50, 0);
+
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Ingestion failed',
+        isLoading: false
+      });
+      throw error;
+    }
   }
 }));

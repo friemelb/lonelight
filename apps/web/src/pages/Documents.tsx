@@ -26,7 +26,7 @@ import {
   Button,
   Grid
 } from '@mui/material';
-import { Refresh, Visibility } from '@mui/icons-material';
+import { Refresh, Visibility, CloudUpload } from '@mui/icons-material';
 import { ProcessingStatus } from '@loanlens/domain';
 import { useDocumentStore } from '../store/documentStore';
 import { StatusChip } from '../components/StatusChip';
@@ -40,13 +40,21 @@ export function Documents() {
     error,
     fetchDocuments,
     setFilters,
-    clearError
+    clearError,
+    ingestDocuments
   } = useDocumentStore();
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [ingestionDialogOpen, setIngestionDialogOpen] = useState(false);
+  const [ingestionResult, setIngestionResult] = useState<{
+    total: number;
+    successful: number;
+    failed: number;
+    errors: Array<{filename: string; error: string}>;
+  } | null>(null);
 
   // Initial fetch
   useEffect(() => {
@@ -80,6 +88,18 @@ export function Documents() {
   // Handle refresh
   const handleRefresh = () => {
     fetchDocuments(filters, rowsPerPage, page * rowsPerPage);
+  };
+
+  // Handle ingestion
+  const handleIngestion = async () => {
+    try {
+      const result = await ingestDocuments();
+      setIngestionResult(result);
+      setIngestionDialogOpen(true);
+    } catch (error) {
+      // Error already set in store
+      console.error('Ingestion failed:', error);
+    }
   };
 
   // Handle row click
@@ -120,6 +140,11 @@ export function Documents() {
               <MenuItem value={ProcessingStatus.ERROR}>Error</MenuItem>
             </Select>
           </FormControl>
+          <Tooltip title="Run ingestion from corpus">
+            <IconButton onClick={handleIngestion} disabled={isLoading}>
+              <CloudUpload />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Refresh">
             <IconButton onClick={handleRefresh} disabled={isLoading}>
               <Refresh />
@@ -330,6 +355,56 @@ export function Documents() {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Ingestion Results Dialog */}
+      <Dialog
+        open={ingestionDialogOpen}
+        onClose={() => setIngestionDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Ingestion Complete
+        </DialogTitle>
+        <DialogContent>
+          {ingestionResult && (
+            <Box>
+              <Typography variant="body1" gutterBottom>
+                Total files processed: <strong>{ingestionResult.total}</strong>
+              </Typography>
+              <Typography variant="body1" gutterBottom color="success.main">
+                Successful: <strong>{ingestionResult.successful}</strong>
+              </Typography>
+              {ingestionResult.failed > 0 && (
+                <>
+                  <Typography variant="body1" gutterBottom color="error.main">
+                    Failed: <strong>{ingestionResult.failed}</strong>
+                  </Typography>
+                  {ingestionResult.errors.length > 0 && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Errors:
+                      </Typography>
+                      {ingestionResult.errors.map((err, idx) => (
+                        <Alert severity="warning" key={idx} sx={{ mb: 1 }}>
+                          <Typography variant="body2">
+                            <strong>{err.filename}</strong>: {err.error}
+                          </Typography>
+                        </Alert>
+                      ))}
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIngestionDialogOpen(false)}>
+            Close
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
