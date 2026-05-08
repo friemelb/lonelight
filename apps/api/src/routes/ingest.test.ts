@@ -113,22 +113,18 @@ describe('Ingest Routes', () => {
 
       expect(response.status).toBe(200);
 
-      // Find the unsupported file (unsupported-test.docx)
-      const unsupportedDoc = response.body.documents.find(
-        (doc: any) => doc.filename === 'unsupported-test.docx'
+      // Note: unsupported-test.docx is now a supported file type (.docx)
+      // It may fail parsing due to being empty/corrupted, but that's different from "Unsupported file type"
+      // Find any files that were marked as FAILED due to being unsupported (not parsing errors)
+      const unsupportedDocs = response.body.documents.filter(
+        (doc: any) => doc.status === ProcessingStatus.FAILED &&
+                      doc.errorMessage &&
+                      doc.errorMessage.includes('Unsupported file type')
       );
 
-      if (unsupportedDoc) {
-        expect(unsupportedDoc.status).toBe(ProcessingStatus.FAILED);
-        expect(unsupportedDoc.errorMessage).toContain('Unsupported file type');
-
-        // Verify it's in the errors array
-        const error = response.body.errors.find(
-          (err: any) => err.filename === 'unsupported-test.docx'
-        );
-        expect(error).toBeDefined();
-        expect(error.error).toContain('Unsupported file type');
-      }
+      // Currently all file types in corpus are supported (.txt, .csv, .md, .json, .pdf, .docx)
+      // So we expect no "Unsupported file type" errors
+      expect(unsupportedDocs.length).toBe(0);
     });
 
     it('should mark supported files as UPLOADED or EXTRACTED', async () => {
@@ -138,7 +134,7 @@ describe('Ingest Routes', () => {
 
       // Find supported files
       const supportedDocs = response.body.documents.filter((doc: any) =>
-        ['.txt', '.csv', '.md', '.json', '.pdf'].some(ext => doc.filename.endsWith(ext))
+        ['.txt', '.csv', '.md', '.json', '.pdf', '.docx'].some(ext => doc.filename.endsWith(ext))
       );
 
       // All supported files should have UPLOADED, EXTRACTED, or FAILED status (PDF parsing may fail)
@@ -206,7 +202,9 @@ describe('Ingest Routes', () => {
         'loan-notes.md': 'text/markdown',
         'readme.txt': 'text/plain',
         'transactions.csv': 'text/csv',
-        'unsupported-test.docx': 'application/octet-stream'
+        'unsupported-test.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'simple.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'complex.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       };
 
       response.body.documents.forEach((doc: any) => {
@@ -316,11 +314,8 @@ describe('Ingest Routes', () => {
       // Each failed document should have an error message
       for (const failedDoc of failedDocs) {
         expect(failedDoc.errorMessage).toBeDefined();
-        // Error message can be either "Unsupported file type" or "No parser available"
-        expect(
-          failedDoc.errorMessage.includes('Unsupported file type') ||
-          failedDoc.errorMessage.includes('No parser available')
-        ).toBe(true);
+        // Error message can be "Unsupported file type", "No parser available", or parsing errors
+        expect(failedDoc.errorMessage.length).toBeGreaterThan(0);
 
         // Verify in database
         const dbDoc = await documentRepository.findById(failedDoc.id);
@@ -433,9 +428,18 @@ describe('Ingest Routes', () => {
 
       expect(response.status).toBe(200);
 
-      // If successful equals total, errors should be empty
-      if (response.body.successful === response.body.total) {
+      // Note: "successful" means successfully ingested (file type recognized)
+      // Files can still fail parsing later (e.g., corrupted files)
+      // Errors array includes both ingestion failures AND parsing failures
+
+      // If failed count is 0 AND parseFailed is 0, errors should be empty
+      if (response.body.failed === 0 && response.body.parseFailed === 0) {
         expect(response.body.errors).toHaveLength(0);
+      }
+
+      // Otherwise, errors array should match the number of failures
+      if (response.body.failed > 0 || response.body.parseFailed > 0) {
+        expect(response.body.errors.length).toBeGreaterThan(0);
       }
     });
   });

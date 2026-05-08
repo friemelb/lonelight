@@ -49,11 +49,16 @@ describe('FileService', () => {
       expect(fileService.getMimeType('paystub.PDF')).toBe('application/pdf');
     });
 
+    it('should return correct MIME type for .docx files', () => {
+      expect(fileService.getMimeType('document.docx')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(fileService.getMimeType('report.DOCX')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    });
+
     it('should return application/octet-stream for unsupported file types', () => {
-      expect(fileService.getMimeType('document.docx')).toBe('application/octet-stream');
       expect(fileService.getMimeType('image.png')).toBe('application/octet-stream');
       expect(fileService.getMimeType('video.mp4')).toBe('application/octet-stream');
       expect(fileService.getMimeType('file.xyz')).toBe('application/octet-stream');
+      expect(fileService.getMimeType('archive.zip')).toBe('application/octet-stream');
     });
 
     it('should handle filenames without extensions', () => {
@@ -74,6 +79,7 @@ describe('FileService', () => {
       expect(fileService.isSupportedFileType('notes.md')).toBe(true);
       expect(fileService.isSupportedFileType('config.json')).toBe(true);
       expect(fileService.isSupportedFileType('paystub.pdf')).toBe(true);
+      expect(fileService.isSupportedFileType('document.docx')).toBe(true);
     });
 
     it('should be case-insensitive for file extensions', () => {
@@ -82,14 +88,15 @@ describe('FileService', () => {
       expect(fileService.isSupportedFileType('notes.MD')).toBe(true);
       expect(fileService.isSupportedFileType('config.JSON')).toBe(true);
       expect(fileService.isSupportedFileType('paystub.PDF')).toBe(true);
+      expect(fileService.isSupportedFileType('report.DOCX')).toBe(true);
     });
 
     it('should return false for unsupported file extensions', () => {
-      expect(fileService.isSupportedFileType('document.docx')).toBe(false);
       expect(fileService.isSupportedFileType('image.png')).toBe(false);
       expect(fileService.isSupportedFileType('video.mp4')).toBe(false);
       expect(fileService.isSupportedFileType('archive.zip')).toBe(false);
       expect(fileService.isSupportedFileType('file.xyz')).toBe(false);
+      expect(fileService.isSupportedFileType('spreadsheet.xls')).toBe(false);
     });
 
     it('should return false for files without extensions', () => {
@@ -219,11 +226,12 @@ describe('FileService', () => {
       await fs.writeFile(path.join(tempDir, 'notes.md'), 'MD', 'utf-8');
       await fs.writeFile(path.join(tempDir, 'config.json'), '{}', 'utf-8');
       await fs.writeFile(path.join(tempDir, 'doc.pdf'), 'PDF', 'utf-8');
-      await fs.writeFile(path.join(tempDir, 'unsupported.docx'), 'DOCX', 'utf-8');
+      await fs.writeFile(path.join(tempDir, 'report.docx'), 'DOCX', 'utf-8');
+      await fs.writeFile(path.join(tempDir, 'unsupported.xls'), 'XLS', 'utf-8');
 
       const files = await fileService.scanDirectory(tempDir);
 
-      expect(files).toHaveLength(6);
+      expect(files).toHaveLength(7);
 
       const mimeTypes = files.reduce(
         (acc, file) => {
@@ -238,7 +246,8 @@ describe('FileService', () => {
       expect(mimeTypes['notes.md']).toBe('text/markdown');
       expect(mimeTypes['config.json']).toBe('application/json');
       expect(mimeTypes['doc.pdf']).toBe('application/pdf');
-      expect(mimeTypes['unsupported.docx']).toBe('application/octet-stream');
+      expect(mimeTypes['report.docx']).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(mimeTypes['unsupported.xls']).toBe('application/octet-stream');
     });
 
     it('should throw error for non-existent directory', async () => {

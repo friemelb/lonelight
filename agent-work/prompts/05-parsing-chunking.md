@@ -35,9 +35,10 @@ Raw documents can be large (multi-page PDFs, long text files, extensive CSV data
 | Markdown | `.md` | MarkdownParser | Fully Supported |
 | CSV Data | `.csv` | CsvParser | Fully Supported |
 | JSON Data | `.json` | JsonParser | Fully Supported |
-| PDF Documents | `.pdf` | None | Not Implemented (Future) |
+| PDF Documents | `.pdf` | PdfParser | Fully Supported |
+| Word Documents | `.docx` | DocxParser | Fully Supported |
 
-**Note:** PDF support is planned but not implemented in this phase. PDFs are registered during ingestion but remain in UPLOADED status until PDF parsing is added.
+**Note:** All file formats in the table are fully supported. The system automatically detects file types and routes them to the appropriate parser.
 
 ## Architecture
 
@@ -192,6 +193,90 @@ export class JsonParser implements IParser {
 
 **Use Cases:** Configuration files, structured data exports, API responses
 
+**5. PdfParser** (`apps/api/src/parsers/PdfParser.ts`)
+
+Extracts text from PDF documents using the `unpdf` library with support for multi-page documents.
+
+```typescript
+export class PdfParser implements IParser {
+  canParse(filePath: string): boolean {
+    return path.extname(filePath).toLowerCase() === '.pdf';
+  }
+
+  async parse(filePath: string): Promise<string> {
+    const buffer = await fs.readFile(filePath);
+    // Convert Buffer to Uint8Array (required by unpdf)
+    const uint8Array = new Uint8Array(buffer);
+    const result = await extractText(uint8Array);
+
+    // Format multi-page PDFs with page markers
+    if (result.text && result.text.length > 1) {
+      return result.text
+        .map((pageText: string, index: number) => {
+          const pageNum = index + 1;
+          return `[Page ${pageNum}]\n${pageText.trim()}`;
+        })
+        .filter((pageContent: string) => {
+          // Filter out empty pages
+          return pageContent.length > `[Page X]`.length + 1;
+        })
+        .join('\n\n');
+    }
+
+    return result.text && result.text.length > 0 ? result.text[0] : '';
+  }
+}
+```
+
+**Behavior:**
+- Uses `unpdf` library for text extraction
+- Requires Uint8Array conversion from Node.js Buffer
+- Multi-page PDFs include page markers: `[Page 1]`, `[Page 2]`, etc.
+- Filters out empty pages automatically
+- Handles password-protected PDFs with specific error messages
+- Detects corrupted or invalid PDF files
+- Preserves page structure with double newlines between pages
+
+**Use Cases:** Loan documents, paystubs, financial statements, contracts, reports
+
+**6. DocxParser** (`apps/api/src/parsers/DocxParser.ts`)
+
+Extracts text from Microsoft Word documents using the `mammoth` library.
+
+```typescript
+export class DocxParser implements IParser {
+  canParse(filePath: string): boolean {
+    return path.extname(filePath).toLowerCase() === '.docx';
+  }
+
+  async parse(filePath: string): Promise<string> {
+    const result = await mammoth.extractRawText({ path: filePath });
+
+    // Log warnings (e.g., unsupported formatting)
+    if (result.messages && result.messages.length > 0) {
+      const warnings = result.messages
+        .filter(m => m.type === 'warning')
+        .map(m => m.message);
+      if (warnings.length > 0) {
+        console.warn('DOCX parsing warnings:', warnings);
+      }
+    }
+
+    return result.value.trim();
+  }
+}
+```
+
+**Behavior:**
+- Uses `mammoth.extractRawText()` for plain text extraction
+- Strips all formatting (bold, italic, fonts, colors)
+- Preserves paragraph structure with newlines
+- Logs warnings for unsupported formatting elements
+- Handles encrypted or password-protected documents with errors
+- Detects invalid or corrupted DOCX files
+
+**Use Cases:** Employment verification letters, appraisals, underwriting reports, loan applications
+
 #### Parser Selection Logic
 
 The `ParsingService` maintains an array of parser instances and selects the first parser that can handle a given file:
@@ -205,7 +290,9 @@ export class ParsingService {
       new TextParser(),
       new MarkdownParser(),
       new CsvParser(),
-      new JsonParser()
+      new JsonParser(),
+      new PdfParser(),
+      new DocxParser()
     ];
   }
 

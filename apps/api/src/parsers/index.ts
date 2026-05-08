@@ -3,3 +3,5 @@ export { TextParser } from './TextParser';
 export { MarkdownParser } from './MarkdownParser';
 export { CsvParser } from './CsvParser';
 export { JsonParser } from './JsonParser';
+export { PdfParser } from './PdfParser';
+export { DocxParser } from './DocxParser';

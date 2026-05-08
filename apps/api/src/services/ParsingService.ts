@@ -1,7 +1,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DocumentRecord, DocumentChunk } from '@loanlens/domain';
-import { IParser, TextParser, MarkdownParser, CsvParser, JsonParser } from '@/parsers';
+import { IParser, TextParser, MarkdownParser, CsvParser, JsonParser, PdfParser, DocxParser } from '@/parsers';
 import { ChunkingService } from './ChunkingService';
 
 // Get __dirname equivalent in ES modules
@@ -30,7 +30,9 @@ export class ParsingService {
       new TextParser(),
       new MarkdownParser(),
       new CsvParser(),
-      new JsonParser()
+      new JsonParser(),
+      new PdfParser(),
+      new DocxParser()
     ];
 
     this.chunkingService = new ChunkingService();

@@ -83,13 +83,49 @@ describe('ParsingService', () => {
       expect(result.chunks.length).toBeGreaterThan(0);
     });
 
-    it('should return error for unsupported file types', async () => {
+    it('should select correct parser for .pdf files', async () => {
       const doc: DocumentRecord = {
         id: 'test-5',
-        filename: 'test.pdf',
+        filename: 'document.pdf',
         mimeType: 'application/pdf',
         fileSize: 100,
-        storagePath: 'corpus/test.pdf',
+        storagePath: 'corpus/loan-214/document.pdf',
+        status: ProcessingStatus.UPLOADED,
+        uploadedAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const result = await service.parseAndChunkDocument(doc);
+
+      expect(result.success).toBe(true);
+      expect(result.chunks.length).toBeGreaterThan(0);
+    });
+
+    it('should select correct parser for .docx files', async () => {
+      const doc: DocumentRecord = {
+        id: 'test-6',
+        filename: 'simple.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        fileSize: 100,
+        storagePath: 'corpus/simple.docx',
+        status: ProcessingStatus.UPLOADED,
+        uploadedAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const result = await service.parseAndChunkDocument(doc);
+
+      expect(result.success).toBe(true);
+      expect(result.chunks.length).toBeGreaterThan(0);
+    });
+
+    it('should return error for unsupported file types', async () => {
+      const doc: DocumentRecord = {
+        id: 'test-7',
+        filename: 'test.xls',
+        mimeType: 'application/vnd.ms-excel',
+        fileSize: 100,
+        storagePath: 'corpus/test.xls',
         status: ProcessingStatus.UPLOADED,
         uploadedAt: new Date(),
         updatedAt: new Date()
@@ -200,6 +236,50 @@ describe('ParsingService', () => {
       expect(content).not.toContain('##');
     });
 
+    it('should successfully parse and chunk .pdf file', async () => {
+      const doc: DocumentRecord = {
+        id: 'pdf-test',
+        filename: 'document.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 92426,
+        storagePath: 'corpus/loan-214/document.pdf',
+        status: ProcessingStatus.UPLOADED,
+        uploadedAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const result = await service.parseAndChunkDocument(doc);
+
+      expect(result.success).toBe(true);
+      expect(result.chunks.length).toBeGreaterThan(0);
+
+      // PDF content should be extracted
+      const content = result.chunks[0].content;
+      expect(content.length).toBeGreaterThan(0);
+    });
+
+    it('should successfully parse and chunk .docx file', async () => {
+      const doc: DocumentRecord = {
+        id: 'docx-test',
+        filename: 'simple.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        fileSize: 5000,
+        storagePath: 'corpus/simple.docx',
+        status: ProcessingStatus.UPLOADED,
+        uploadedAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const result = await service.parseAndChunkDocument(doc);
+
+      expect(result.success).toBe(true);
+      expect(result.chunks.length).toBeGreaterThan(0);
+
+      // DOCX should have text extracted
+      const content = result.chunks[0].content;
+      expect(content).toContain('simple test document');
+    });
+
     it('should handle parsing errors gracefully', async () => {
       const doc: DocumentRecord = {
         id: 'error-test',
@@ -282,6 +362,18 @@ describe('ParsingService', () => {
           mimeType: 'text/markdown',
           fileSize: 110,
           storagePath: 'corpus/loan-notes.md'
+        },
+        {
+          filename: 'document.pdf',
+          mimeType: 'application/pdf',
+          fileSize: 92426,
+          storagePath: 'corpus/loan-214/document.pdf'
+        },
+        {
+          filename: 'simple.docx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          fileSize: 5000,
+          storagePath: 'corpus/simple.docx'
         }
       ];
 

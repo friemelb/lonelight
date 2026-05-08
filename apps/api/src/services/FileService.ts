@@ -21,7 +21,8 @@ export class FileService {
     '.csv': 'text/csv',
     '.md': 'text/markdown',
     '.json': 'application/json',
-    '.pdf': 'application/pdf'
+    '.pdf': 'application/pdf',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   };
 
   /**
