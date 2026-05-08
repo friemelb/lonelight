@@ -2,16 +2,23 @@ import { useEffect, useState } from 'react';
 import { Box, Typography, Paper, Grid, Button, Alert, Snackbar } from '@mui/material';
 import { DeleteSweep } from '@mui/icons-material';
 import { useAppStore } from '@/store/appStore';
+import { useMetricsStore } from '@/store/metricsStore';
 
 export function Dashboard() {
   const { apiHealth, fetchHealthCheck } = useAppStore();
+  const { metrics, fetchMetrics } = useMetricsStore();
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHealthCheck();
-  }, [fetchHealthCheck]);
+    fetchMetrics();
+
+    // Refresh metrics every 30 seconds
+    const interval = setInterval(fetchMetrics, 30000);
+    return () => clearInterval(interval);
+  }, [fetchHealthCheck, fetchMetrics]);
 
   const handleResetDatabase = async () => {
     if (!confirm('⚠️ WARNING: This will delete ALL data in the database. This cannot be undone. Are you sure?')) {
@@ -31,8 +38,9 @@ export function Dashboard() {
       await response.json();
       setResetSuccess(true);
 
-      // Refresh health check after reset
+      // Refresh health check and metrics after reset
       fetchHealthCheck();
+      fetchMetrics();
     } catch (error) {
       setResetError(error instanceof Error ? error.message : 'Reset failed');
     } finally {
@@ -92,25 +100,107 @@ export function Dashboard() {
             )}
           </Paper>
         </Grid>
+        {/* Total Documents */}
         <Grid item xs={12} md={6} lg={4}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Documents
+              Total Documents
             </Typography>
-            <Typography variant="h3">0</Typography>
+            <Typography variant="h3">
+              {metrics?.totalDocuments ?? '-'}
+            </Typography>
             <Typography variant="body2" color="text.secondary">
-              Total documents processed
+              Documents in system
             </Typography>
           </Paper>
         </Grid>
+
+        {/* Documents by Status */}
         <Grid item xs={12} md={6} lg={4}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Borrowers
+              Extracted Documents
             </Typography>
-            <Typography variant="h3">0</Typography>
+            <Typography variant="h3" color="success.main">
+              {metrics?.byStatus.extracted ?? '-'}
+            </Typography>
             <Typography variant="body2" color="text.secondary">
-              Total borrowers extracted
+              Successfully processed
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Failed Documents */}
+        <Grid item xs={12} md={6} lg={4}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Failed Documents
+            </Typography>
+            <Typography variant="h3" color="error.main">
+              {metrics?.byStatus.failed ?? '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Processing failures
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Total Chunks */}
+        <Grid item xs={12} md={6} lg={4}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Total Chunks
+            </Typography>
+            <Typography variant="h3">
+              {metrics?.totalChunks ?? '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Text chunks created
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Success Rate */}
+        <Grid item xs={12} md={6} lg={4}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Success Rate
+            </Typography>
+            <Typography variant="h3" color="success.main">
+              {metrics ? `${metrics.successRate.toFixed(1)}%` : '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Processing success rate
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Avg Processing Time */}
+        <Grid item xs={12} md={6} lg={4}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Avg Processing Time
+            </Typography>
+            <Typography variant="h3">
+              {metrics ? `${metrics.avgProcessingTimeMs}ms` : '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Per document
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Recent Errors */}
+        <Grid item xs={12} md={6} lg={4}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Recent Errors
+            </Typography>
+            <Typography variant="h3" color={metrics && metrics.recentErrorCount > 0 ? 'warning.main' : 'text.primary'}>
+              {metrics?.recentErrorCount ?? '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Last 24 hours
             </Typography>
           </Paper>
         </Grid>

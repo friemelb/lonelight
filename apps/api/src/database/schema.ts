@@ -123,6 +123,48 @@ export function initializeSchema(db: Database.Database): void {
       CREATE INDEX idx_errors_resolved ON processing_errors(resolved);
     `);
 
+    // 6. Processing metrics table (observability)
+    db.exec(`
+      CREATE TABLE processing_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id TEXT NOT NULL,
+        metric_type TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        duration_ms INTEGER,
+        success INTEGER NOT NULL,
+        error_message TEXT,
+        metadata TEXT,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_metrics_document_id ON processing_metrics(document_id);
+      CREATE INDEX idx_metrics_type ON processing_metrics(metric_type);
+      CREATE INDEX idx_metrics_started_at ON processing_metrics(started_at);
+      CREATE INDEX idx_metrics_success ON processing_metrics(success);
+    `);
+
+    // 7. Extraction attempts table (retry tracking)
+    db.exec(`
+      CREATE TABLE extraction_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id TEXT NOT NULL,
+        attempt_number INTEGER NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        status TEXT NOT NULL,
+        error_type TEXT,
+        error_message TEXT,
+        chunks_processed INTEGER,
+        fields_extracted INTEGER,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_attempts_document_id ON extraction_attempts(document_id);
+      CREATE INDEX idx_attempts_status ON extraction_attempts(status);
+      CREATE INDEX idx_attempts_started_at ON extraction_attempts(started_at);
+    `);
+
     console.log('✅ Database schema initialized successfully');
   })();
 }

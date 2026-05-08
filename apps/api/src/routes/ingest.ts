@@ -3,10 +3,11 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDatabase } from '@/database';
-import { DocumentRepository, ChunkRepository } from '@/repositories';
+import { DocumentRepository, ChunkRepository, MetricsRepository } from '@/repositories';
 import { FileService } from '@/services/FileService';
 import { ParsingService } from '@/services/ParsingService';
 import { ProcessingStatus, DocumentRecord } from '@loanlens/domain';
+import { Logger } from '@/utils/logger';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -30,23 +31,27 @@ interface IngestResponse {
  * Scan the corpus directory and ingest all documents into the database
  */
 ingestRouter.post('/', async (_req: Request, res: Response) => {
+  const ingestionStart = Date.now();
+
   try {
     const db = getDatabase();
     const documentRepository = new DocumentRepository(db);
+    const metricsRepository = new MetricsRepository(db);
     const fileService = new FileService();
 
     // Define the corpus directory path
     const corpusPath = path.join(__dirname, '../../data/corpus');
     const dataPath = path.join(__dirname, '../../data');
 
-    console.log(`Scanning corpus directory: ${corpusPath}`);
+    Logger.info('Starting document ingestion', { operation: 'ingestion', corpusPath });
 
     // Scan the corpus directory
     let files;
     try {
       files = await fileService.scanDirectory(corpusPath);
+      Logger.info('Corpus directory scanned', { fileCount: files.length });
     } catch (error) {
-      console.error('Error scanning corpus directory:', error);
+      Logger.error('Failed to scan corpus directory', error as Error, { corpusPath });
       return res.status(500).json({
         error: {
           message: 'Failed to scan corpus directory',
@@ -116,7 +121,10 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
         await documentRepository.create(document);
         documents.push(document);
       } catch (dbError) {
-        console.error(`Failed to save document ${file.filename}:`, dbError);
+        Logger.error(`Failed to save document ${file.filename}`, dbError as Error, {
+          filename: file.filename,
+          documentId
+        });
         errors.push({
           filename: file.filename,
           error: 'Database error: Failed to save document'
@@ -139,8 +147,14 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
         continue;
       }
 
+      const parsingStart = Date.now();
+
       try {
-        console.log(`Parsing document: ${doc.filename}`);
+        Logger.info('Starting document parsing', {
+          operation: 'parsing',
+          documentId: doc.id,
+          filename: doc.filename
+        });
 
         // Update status to PROCESSING
         await documentRepository.updateStatus(doc.id, ProcessingStatus.PROCESSING);
@@ -152,7 +166,29 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
           // Save chunks to database
           await chunkRepository.createMany(parseResult.chunks);
 
-          console.log(`Created ${parseResult.chunks.length} chunks for ${doc.filename}`);
+          const parsingDuration = Date.now() - parsingStart;
+
+          Logger.info('Document parsing completed', {
+            operation: 'parsing',
+            documentId: doc.id,
+            filename: doc.filename,
+            chunkCount: parseResult.chunks.length,
+            duration: parsingDuration
+          });
+
+          // Record parsing metric
+          await metricsRepository.createProcessingMetric({
+            documentId: doc.id,
+            metricType: 'parsing',
+            startedAt: new Date(parsingStart),
+            completedAt: new Date(),
+            durationMs: parsingDuration,
+            success: true,
+            metadata: {
+              chunkCount: parseResult.chunks.length,
+              filename: doc.filename
+            }
+          });
 
           // Update document status to EXTRACTED
           await documentRepository.updateStatus(doc.id, ProcessingStatus.EXTRACTED);
@@ -171,6 +207,27 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
         } else {
           // Parsing failed
           const errorMsg = parseResult.error || 'Failed to parse document';
+          const parsingDuration = Date.now() - parsingStart;
+
+          Logger.error('Document parsing failed', new Error(errorMsg), {
+            operation: 'parsing',
+            documentId: doc.id,
+            filename: doc.filename,
+            duration: parsingDuration
+          });
+
+          // Record parsing failure metric
+          await metricsRepository.createProcessingMetric({
+            documentId: doc.id,
+            metricType: 'parsing',
+            startedAt: new Date(parsingStart),
+            completedAt: new Date(),
+            durationMs: parsingDuration,
+            success: false,
+            errorMessage: errorMsg,
+            metadata: { filename: doc.filename }
+          });
+
           await documentRepository.updateStatus(
             doc.id,
             ProcessingStatus.FAILED,
@@ -190,7 +247,26 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
       } catch (error) {
         // Handle unexpected errors
         const errorMsg = error instanceof Error ? error.message : 'Unknown parsing error';
-        console.error(`Error parsing document ${doc.filename}:`, errorMsg);
+        const parsingDuration = Date.now() - parsingStart;
+
+        Logger.error(`Unexpected error parsing document ${doc.filename}`, error as Error, {
+          operation: 'parsing',
+          documentId: doc.id,
+          filename: doc.filename,
+          duration: parsingDuration
+        });
+
+        // Record parsing failure metric
+        await metricsRepository.createProcessingMetric({
+          documentId: doc.id,
+          metricType: 'parsing',
+          startedAt: new Date(parsingStart),
+          completedAt: new Date(),
+          durationMs: parsingDuration,
+          success: false,
+          errorMessage: errorMsg,
+          metadata: { filename: doc.filename }
+        });
 
         await documentRepository.updateStatus(
           doc.id,
@@ -209,7 +285,25 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
       }
     }
 
-    console.log(`Parsing complete: ${parsedCount} parsed, ${parseFailedCount} failed, ${totalChunks} total chunks`);
+    const ingestionDuration = Date.now() - ingestionStart;
+
+    Logger.info('Parsing phase complete', {
+      operation: 'parsing',
+      parsedCount,
+      parseFailedCount,
+      totalChunks
+    });
+
+    Logger.info('Ingestion complete', {
+      operation: 'ingestion',
+      total: files.length,
+      successful,
+      failed,
+      parsed: parsedCount,
+      parseFailed: parseFailedCount,
+      totalChunks,
+      duration: ingestionDuration
+    });
 
     // Return response
     const response: IngestResponse = {
@@ -223,13 +317,12 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
       errors
     };
 
-    console.log(
-      `Ingestion complete: ${successful} successful, ${failed} failed out of ${files.length} total`
-    );
-
     return res.status(200).json(response);
   } catch (error) {
-    console.error('Error during ingestion:', error);
+    Logger.error('Fatal error during ingestion', error as Error, {
+      operation: 'ingestion',
+      duration: Date.now() - ingestionStart
+    });
     return res.status(500).json({
       error: {
         message: 'Internal server error during ingestion',
