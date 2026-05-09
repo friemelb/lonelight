@@ -5,7 +5,28 @@ import type Database from 'better-sqlite3';
 import { getTestDatabase } from '@/database';
 import { BorrowerRepository, DocumentRepository } from '@/repositories';
 import type { ExtractedField } from '@loanlens/domain';
-import { ProcessingStatus } from '@loanlens/domain';
+import { ProcessingStatus, ReviewStatus } from '@loanlens/domain';
+
+// Mock OpenAI so the extraction route never hits the real API during tests.
+vi.mock('openai', () => {
+  return {
+    default: vi.fn().mockImplementation(() => ({
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({ borrowers: [] })
+                }
+              }
+            ]
+          })
+        }
+      }
+    }))
+  };
+});
 
 // Mock the database module
 vi.mock('@/database', async () => {
@@ -77,7 +98,8 @@ describe('Borrowers Routes', () => {
         email: createField('john@example.com'),
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-01'),
-        documentIds: []
+        documentIds: [],
+        reviewStatus: ReviewStatus.PENDING_REVIEW
       });
 
       await borrowerRepository.create({
@@ -88,7 +110,8 @@ describe('Borrowers Routes', () => {
         phoneNumber: createField('555-1234'),
         createdAt: new Date('2024-01-02'),
         updatedAt: new Date('2024-01-02'),
-        documentIds: []
+        documentIds: [],
+        reviewStatus: ReviewStatus.PENDING_REVIEW
       });
 
       await borrowerRepository.create({
@@ -98,7 +121,8 @@ describe('Borrowers Routes', () => {
         lastName: createField('Johnson'),
         createdAt: new Date('2024-01-03'),
         updatedAt: new Date('2024-01-03'),
-        documentIds: []
+        documentIds: [],
+        reviewStatus: ReviewStatus.PENDING_REVIEW
       });
     });
 
@@ -195,7 +219,8 @@ describe('Borrowers Routes', () => {
         phoneNumber: createField('555-9876'),
         createdAt: new Date('2024-01-15T10:00:00Z'),
         updatedAt: new Date('2024-01-15T10:00:00Z'),
-        documentIds: []
+        documentIds: [],
+        reviewStatus: ReviewStatus.PENDING_REVIEW
       });
     });
 
@@ -260,7 +285,8 @@ describe('Borrowers Routes', () => {
         },
         createdAt: new Date(),
         updatedAt: new Date(),
-        documentIds: []
+        documentIds: [],
+        reviewStatus: ReviewStatus.PENDING_REVIEW
       });
 
       // Create documents for this borrower
@@ -318,7 +344,8 @@ describe('Borrowers Routes', () => {
         fullName: createField('No Documents Person'),
         createdAt: new Date(),
         updatedAt: new Date(),
-        documentIds: []
+        documentIds: [],
+        reviewStatus: ReviewStatus.PENDING_REVIEW
       });
 
       const response = await request(app).get('/api/borrowers/borrower-no-docs/documents');

@@ -6,7 +6,7 @@
  */
 
 import OpenAI from 'openai';
-import { DocumentRecord, DocumentChunk, BorrowerRecord } from '@loanlens/domain';
+import { DocumentRecord, DocumentChunk, BorrowerRecord, ReviewStatus } from '@loanlens/domain';
 import {
   OpenAIExtractionResponseSchema,
   type BorrowerExtractionType
@@ -416,7 +416,8 @@ Try again:`;
       loanNumbers: extraction.loanNumbers as any,
       createdAt: extraction.createdAt ? new Date(extraction.createdAt) : now,
       updatedAt: extraction.updatedAt ? new Date(extraction.updatedAt) : now,
-      documentIds: extraction.documentIds || []
+      documentIds: extraction.documentIds || [],
+      reviewStatus: ReviewStatus.PENDING_REVIEW
     };
   }
 
@@ -587,7 +588,7 @@ Try again:`;
       phoneNumber: mergeField(a.phoneNumber, b.phoneNumber),
       alternatePhoneNumber: mergeField(a.alternatePhoneNumber, b.alternatePhoneNumber),
       email: mergeField(a.email, b.email),
-      currentAddress: mergeField(a.currentAddress, b.currentAddress),
+      currentAddress: b.currentAddress || a.currentAddress,
 
       // Combine arrays (deduplicate by value)
       previousAddresses: [...(a.previousAddresses || []), ...(b.previousAddresses || [])],

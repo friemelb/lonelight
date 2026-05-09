@@ -10,6 +10,44 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 
+// Mock OpenAI so even if extraction runs we never hit the real API.
+vi.mock('openai', () => {
+  return {
+    default: vi.fn().mockImplementation(() => ({
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({ borrowers: [] })
+                }
+              }
+            ]
+          })
+        }
+      }
+    }))
+  };
+});
+
+// Mock config to empty the OpenAI key so the ingest route skips the
+// extraction phase entirely. These tests cover ingestion + parsing only,
+// and the batched extraction's inter-batch delays would otherwise time them out.
+vi.mock('@/config', async () => {
+  const actual = await vi.importActual<typeof import('@/config')>('@/config');
+  return {
+    ...actual,
+    config: {
+      ...actual.config,
+      openai: {
+        ...actual.config.openai,
+        apiKey: ''
+      }
+    }
+  };
+});
+
 // Mock the database module
 vi.mock('@/database', async () => {
   const actual = await vi.importActual('@/database');

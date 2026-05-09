@@ -1,0 +1,13 @@
+{
+  "borrower": {
+    "fullName": "John Homeowner",
+    "ssn": "123-45-6789",
+    "dateOfBirth": "1985-04-12",
+    "email": "john.homeowner@example.com",
+    "phoneNumber": "555-123-4567"
+  },
+  "employer": {
+    "name": "Acme Corporation",
+    "annualIncome": 120000
+  }
+}

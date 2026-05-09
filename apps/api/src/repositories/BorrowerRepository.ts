@@ -346,7 +346,7 @@ export class BorrowerRepository implements IBorrowerRepository {
       phoneNumber: mergeField(existing.phoneNumber, incoming.phoneNumber),
       alternatePhoneNumber: mergeField(existing.alternatePhoneNumber, incoming.alternatePhoneNumber),
       email: mergeField(existing.email, incoming.email),
-      currentAddress: mergeField(existing.currentAddress, incoming.currentAddress),
+      currentAddress: incoming.currentAddress || existing.currentAddress,
 
       // Combine arrays (deduplicate by value)
       previousAddresses: this.mergeAddressArrays(

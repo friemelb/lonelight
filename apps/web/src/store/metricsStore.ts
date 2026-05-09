@@ -1,20 +1,5 @@
 import { create } from 'zustand';
-
-interface MetricsSummary {
-  totalDocuments: number;
-  byStatus: {
-    uploaded: number;
-    processing: number;
-    extracted: number;
-    failed: number;
-    completed: number;
-  };
-  totalChunks: number;
-  avgProcessingTimeMs: number;
-  successRate: number;
-  recentErrorCount: number;
-  recentMetrics: any[];
-}
+import type { MetricsSummary } from '@loanlens/domain';
 
 interface MetricsStore {
   metrics: MetricsSummary | null;

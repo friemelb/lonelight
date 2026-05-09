@@ -20,8 +20,9 @@ import {
   InputAdornment,
   Chip
 } from '@mui/material';
-import { Refresh, Search, Person } from '@mui/icons-material';
+import { Refresh, Search, Person, CheckCircle, Cancel, Edit, PendingActions } from '@mui/icons-material';
 import { useBorrowerStore } from '../store/borrowerStore';
+import { ReviewStatus } from '@loanlens/domain';
 
 export function Borrowers() {
   const navigate = useNavigate();
@@ -93,6 +94,21 @@ export function Borrowers() {
     return first || last || '—';
   };
 
+  // Get review status display info
+  const getReviewStatusInfo = (status: ReviewStatus) => {
+    switch (status) {
+      case ReviewStatus.APPROVED:
+        return { color: 'success' as const, icon: <CheckCircle />, label: 'Approved' };
+      case ReviewStatus.REJECTED:
+        return { color: 'error' as const, icon: <Cancel />, label: 'Rejected' };
+      case ReviewStatus.CORRECTED:
+        return { color: 'warning' as const, icon: <Edit />, label: 'Corrected' };
+      case ReviewStatus.PENDING_REVIEW:
+      default:
+        return { color: 'default' as const, icon: <PendingActions />, label: 'Pending' };
+    }
+  };
+
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
@@ -135,6 +151,7 @@ export function Borrowers() {
               <TableCell>Full Name</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Phone</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell>Updated</TableCell>
               <TableCell align="center"># Documents</TableCell>
             </TableRow>
@@ -147,13 +164,14 @@ export function Borrowers() {
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton /></TableCell>
+                  <TableCell><Skeleton width={100} /></TableCell>
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton width={50} /></TableCell>
                 </TableRow>
               ))
             ) : borrowers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
+                <TableCell colSpan={6} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                     {localSearchQuery ? 'No borrowers found matching your search' : 'No borrowers found'}
                   </Typography>
@@ -184,6 +202,14 @@ export function Borrowers() {
                     <Typography variant="body2">
                       {borrower.phoneNumber?.value || '—'}
                     </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      icon={getReviewStatusInfo(borrower.reviewStatus).icon}
+                      label={getReviewStatusInfo(borrower.reviewStatus).label}
+                      color={getReviewStatusInfo(borrower.reviewStatus).color}
+                      size="small"
+                    />
                   </TableCell>
                   <TableCell>
                     {borrower.updatedAt.toLocaleDateString()}

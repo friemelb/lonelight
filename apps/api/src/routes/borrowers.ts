@@ -5,7 +5,6 @@ import { ExtractionService } from '@/services/ExtractionService';
 import { config } from '@/config';
 import { Logger } from '@/utils/logger';
 import { ProcessingStatus, BorrowerRecord, ReviewStatus } from '@loanlens/domain';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Individual extraction error
