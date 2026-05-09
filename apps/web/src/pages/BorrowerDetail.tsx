@@ -48,6 +48,15 @@ export function BorrowerDetail() {
     }
   };
 
+  // Handle view source document
+  const handleViewSource = (documentId: string, page?: number) => {
+    if (page) {
+      navigate(`/documents/${documentId}?page=${page}`);
+    } else {
+      navigate(`/documents/${documentId}`);
+    }
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -149,6 +158,7 @@ export function BorrowerDetail() {
             <ExtractedFieldDisplay
               label="Full Name"
               field={selectedBorrower.fullName}
+              onViewSource={handleViewSource}
             />
 
             {(selectedBorrower.firstName || selectedBorrower.lastName) && (
@@ -159,12 +169,14 @@ export function BorrowerDetail() {
                     <ExtractedFieldDisplay
                       label="First Name"
                       field={selectedBorrower.firstName}
+                      onViewSource={handleViewSource}
                     />
                   </Grid>
                   <Grid item xs={6}>
                     <ExtractedFieldDisplay
                       label="Last Name"
                       field={selectedBorrower.lastName}
+                      onViewSource={handleViewSource}
                     />
                   </Grid>
                 </Grid>
@@ -175,12 +187,14 @@ export function BorrowerDetail() {
             <ExtractedFieldDisplay
               label="Date of Birth"
               field={selectedBorrower.dateOfBirth}
+              onViewSource={handleViewSource}
             />
 
             <Divider sx={{ my: 2 }} />
             <ExtractedFieldDisplay
               label="SSN"
               field={selectedBorrower.ssn}
+              onViewSource={handleViewSource}
             />
           </Paper>
         </Grid>
@@ -196,12 +210,14 @@ export function BorrowerDetail() {
             <ExtractedFieldDisplay
               label="Email"
               field={selectedBorrower.email}
+              onViewSource={handleViewSource}
             />
 
             <Divider sx={{ my: 2 }} />
             <ExtractedFieldDisplay
               label="Phone Number"
               field={selectedBorrower.phoneNumber}
+              onViewSource={handleViewSource}
             />
 
             {selectedBorrower.alternatePhoneNumber && (
@@ -210,6 +226,7 @@ export function BorrowerDetail() {
                 <ExtractedFieldDisplay
                   label="Alternate Phone"
                   field={selectedBorrower.alternatePhoneNumber}
+                  onViewSource={handleViewSource}
                 />
               </>
             )}

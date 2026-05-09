@@ -3,11 +3,13 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDatabase } from '@/database';
-import { DocumentRepository, ChunkRepository, MetricsRepository } from '@/repositories';
+import { DocumentRepository, ChunkRepository, MetricsRepository, BorrowerRepository } from '@/repositories';
 import { FileService } from '@/services/FileService';
 import { ParsingService } from '@/services/ParsingService';
+import { ExtractionService } from '@/services/ExtractionService';
 import { ProcessingStatus, DocumentRecord } from '@loanlens/domain';
 import { Logger } from '@/utils/logger';
+import { config } from '@/config';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -22,6 +24,9 @@ interface IngestResponse {
   parsed: number;
   parseFailed: number;
   totalChunks: number;
+  borrowersExtracted: number;
+  extractionSuccess: boolean;
+  extractionError?: string;
   documents: DocumentRecord[];
   errors: Array<{ filename: string; error: string }>;
 }
@@ -285,14 +290,177 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
       }
     }
 
-    const ingestionDuration = Date.now() - ingestionStart;
-
     Logger.info('Parsing phase complete', {
       operation: 'parsing',
       parsedCount,
       parseFailedCount,
       totalChunks
     });
+
+    // NEW: Automatic borrower extraction after parsing
+    let borrowersExtracted = 0;
+    let extractionSuccess = false;
+    let extractionError: string | undefined;
+
+    // Only attempt extraction if we have successfully parsed documents
+    if (parsedCount > 0 && config.openai.apiKey && config.openai.apiKey.trim() !== '') {
+      const extractionStart = Date.now();
+
+      try {
+        Logger.info('Starting automatic borrower extraction', {
+          operation: 'extraction',
+          documentCount: parsedCount,
+          chunkCount: totalChunks
+        });
+
+        const borrowerRepository = new BorrowerRepository(db);
+
+        // Get all successfully parsed documents (EXTRACTED status)
+        const extractedDocs = documents.filter((d) => d.status === ProcessingStatus.EXTRACTED);
+
+        // Get all chunks for extraction
+        const allChunks = [];
+        for (const doc of extractedDocs) {
+          const chunks = await chunkRepository.findByDocumentId(doc.id);
+          allChunks.push(...chunks);
+        }
+
+        // Initialize extraction service
+        const extractionService = new ExtractionService(config.openai.apiKey, config.openai.model);
+
+        // Extract borrowers in batches (5 docs per batch to avoid rate limits)
+        const extractionResult = await extractionService.extractBorrowersInBatches(
+          {
+            documents: extractedDocs,
+            chunks: allChunks
+          },
+          {
+            maxDocumentsPerBatch: 5,
+            maxChunksPerBatch: 30,
+            maxCharactersPerBatch: 40000
+          }
+        );
+
+        if (extractionResult.success && extractionResult.borrowers.length > 0) {
+          // Save extracted borrowers to database
+          for (const borrower of extractionResult.borrowers) {
+            try {
+              // Upsert borrower record (update if exists, create if not)
+              await borrowerRepository.upsert(borrower);
+
+              // Link documents to borrower and update status to COMPLETED
+              for (const docId of borrower.documentIds) {
+                try {
+                  await documentRepository.update(docId, {
+                    borrowerId: borrower.id,
+                    status: ProcessingStatus.COMPLETED
+                  });
+
+                  // Update the document object in memory (for response)
+                  const doc = documents.find((d) => d.id === docId);
+                  if (doc) {
+                    doc.status = ProcessingStatus.COMPLETED;
+                  }
+                } catch (linkError) {
+                  Logger.error(`Failed to link document ${docId} to borrower`, linkError as Error, {
+                    operation: 'extraction',
+                    borrowerId: borrower.id,
+                    documentId: docId
+                  });
+                }
+              }
+
+              borrowersExtracted++;
+
+              Logger.info('Saved borrower during auto-extraction', {
+                operation: 'extraction',
+                borrowerId: borrower.id,
+                documentCount: borrower.documentIds.length
+              });
+            } catch (saveError) {
+              Logger.error('Failed to save borrower during auto-extraction', saveError as Error, {
+                operation: 'extraction',
+                borrowerId: borrower.id
+              });
+            }
+          }
+
+          const extractionDuration = Date.now() - extractionStart;
+
+          // Record extraction success metric
+          await metricsRepository.createProcessingMetric({
+            documentId: extractedDocs[0]?.id || 'batch',
+            metricType: 'extraction',
+            startedAt: new Date(extractionStart),
+            completedAt: new Date(),
+            durationMs: extractionDuration,
+            success: true,
+            metadata: {
+              documentCount: extractedDocs.length,
+              chunkCount: allChunks.length,
+              borrowerCount: borrowersExtracted,
+              retryAttempted: extractionResult.retryAttempted || false
+            }
+          });
+
+          extractionSuccess = true;
+
+          Logger.info('Automatic extraction completed', {
+            operation: 'extraction',
+            borrowerCount: borrowersExtracted,
+            duration: extractionDuration
+          });
+        } else {
+          // Extraction failed
+          const extractionDuration = Date.now() - extractionStart;
+          extractionError = extractionResult.error || 'Extraction returned no borrowers';
+
+          Logger.warn('Automatic extraction failed', {
+            operation: 'extraction',
+            error: extractionError,
+            validationErrors: extractionResult.validationErrors,
+            duration: extractionDuration
+          });
+
+          // Record extraction failure metric
+          await metricsRepository.createProcessingMetric({
+            documentId: extractedDocs[0]?.id || 'batch',
+            metricType: 'extraction',
+            startedAt: new Date(extractionStart),
+            completedAt: new Date(),
+            durationMs: extractionDuration,
+            success: false,
+            errorMessage: extractionError,
+            metadata: {
+              documentCount: extractedDocs.length,
+              chunkCount: allChunks.length,
+              validationErrors: extractionResult.validationErrors
+            }
+          });
+
+          extractionSuccess = false;
+        }
+      } catch (extractionErr) {
+        const extractionDuration = Date.now() - extractionStart;
+        extractionError =
+          extractionErr instanceof Error ? extractionErr.message : 'Unknown extraction error';
+
+        Logger.error('Fatal error during automatic extraction', extractionErr as Error, {
+          operation: 'extraction',
+          duration: extractionDuration
+        });
+
+        extractionSuccess = false;
+      }
+    } else if (parsedCount > 0) {
+      // Parsed documents but OpenAI key not configured
+      extractionError = 'OpenAI API key not configured - borrower extraction skipped';
+      Logger.warn('Skipping automatic extraction - OpenAI API key not configured', {
+        operation: 'extraction'
+      });
+    }
+
+    const ingestionDuration = Date.now() - ingestionStart;
 
     Logger.info('Ingestion complete', {
       operation: 'ingestion',
@@ -302,6 +470,8 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
       parsed: parsedCount,
       parseFailed: parseFailedCount,
       totalChunks,
+      borrowersExtracted,
+      extractionSuccess,
       duration: ingestionDuration
     });
 
@@ -313,6 +483,9 @@ ingestRouter.post('/', async (_req: Request, res: Response) => {
       parsed: parsedCount,
       parseFailed: parseFailedCount,
       totalChunks,
+      borrowersExtracted,
+      extractionSuccess,
+      extractionError,
       documents,
       errors
     };

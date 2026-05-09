@@ -21,6 +21,12 @@ debugRouter.post('/reset-database', async (_req: Request, res: Response) => {
     // Drop all tables in correct order (reverse of foreign key dependencies)
     // Must respect foreign key constraints: child tables before parent tables
     db.transaction(() => {
+      console.log('  → Dropping extraction_attempts table');
+      db.exec('DROP TABLE IF EXISTS extraction_attempts');
+
+      console.log('  → Dropping processing_metrics table');
+      db.exec('DROP TABLE IF EXISTS processing_metrics');
+
       console.log('  → Dropping processing_errors table');
       db.exec('DROP TABLE IF EXISTS processing_errors');
 

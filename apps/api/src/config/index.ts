@@ -17,5 +17,11 @@ export const config = {
 
   // Database configuration
   databasePath: process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'loanlens.db'),
-  databaseVerbose: process.env.DATABASE_VERBOSE === 'true'
+  databaseVerbose: process.env.DATABASE_VERBOSE === 'true',
+
+  // OpenAI configuration
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-4o-2024-11-20'
+  }
 } as const;

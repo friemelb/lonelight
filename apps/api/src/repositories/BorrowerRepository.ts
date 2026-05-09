@@ -256,6 +256,155 @@ export class BorrowerRepository implements IBorrowerRepository {
   }
 
   /**
+   * Find a borrower by full name or SSN
+   * First tries to match by SSN (if provided), then falls back to normalized full name
+   */
+  async findByFullNameOrSSN(fullName: string, ssn?: string): Promise<BorrowerRecord | null> {
+    // Try to find by SSN first (most reliable)
+    if (ssn && ssn.trim() !== '') {
+      const ssnStmt = this.db.prepare(`
+        SELECT borrower_id FROM borrower_fields
+        WHERE field_name = 'ssn' AND field_value = ?
+        LIMIT 1
+      `);
+      const ssnRow = ssnStmt.get(ssn) as any;
+
+      if (ssnRow) {
+        return await this.findById(ssnRow.borrower_id);
+      }
+    }
+
+    // Fall back to normalized full name match
+    const normalizedName = fullName.toLowerCase().trim();
+
+    const nameStmt = this.db.prepare(`
+      SELECT borrower_id FROM borrower_fields
+      WHERE field_name = 'fullName' AND LOWER(TRIM(field_value)) = ?
+      LIMIT 1
+    `);
+    const nameRow = nameStmt.get(normalizedName) as any;
+
+    if (nameRow) {
+      return await this.findById(nameRow.borrower_id);
+    }
+
+    return null;
+  }
+
+  /**
+   * Upsert a borrower - update if exists (by SSN or full name), create if not
+   * Merges data with existing borrower, keeping higher confidence values
+   */
+  async upsert(borrower: BorrowerRecord): Promise<void> {
+    // Check if borrower already exists
+    const existing = await this.findByFullNameOrSSN(
+      borrower.fullName.value,
+      borrower.ssn?.value
+    );
+
+    if (existing) {
+      // Merge with existing borrower
+      const merged = this.mergeBorrowerRecords(existing, borrower);
+      await this.update(existing.id, merged);
+    } else {
+      // Create new borrower
+      await this.create(borrower);
+    }
+  }
+
+  /**
+   * Merge two borrower records, keeping higher confidence values
+   * Adapted from ExtractionService merge logic
+   */
+  private mergeBorrowerRecords(existing: BorrowerRecord, incoming: BorrowerRecord): BorrowerRecord {
+    const mergeField = <T extends { confidence: number }>(
+      fieldA: T | undefined,
+      fieldB: T | undefined
+    ): T | undefined => {
+      if (!fieldA) return fieldB;
+      if (!fieldB) return fieldA;
+      return fieldA.confidence >= fieldB.confidence ? fieldA : fieldB;
+    };
+
+    return {
+      ...existing,
+      // Keep field with higher confidence
+      fullName: existing.fullName.confidence >= incoming.fullName.confidence
+        ? existing.fullName
+        : incoming.fullName,
+      firstName: mergeField(existing.firstName, incoming.firstName),
+      middleName: mergeField(existing.middleName, incoming.middleName),
+      lastName: mergeField(existing.lastName, incoming.lastName),
+      ssn: mergeField(existing.ssn, incoming.ssn),
+      dateOfBirth: mergeField(existing.dateOfBirth, incoming.dateOfBirth),
+      phoneNumber: mergeField(existing.phoneNumber, incoming.phoneNumber),
+      alternatePhoneNumber: mergeField(existing.alternatePhoneNumber, incoming.alternatePhoneNumber),
+      email: mergeField(existing.email, incoming.email),
+      currentAddress: mergeField(existing.currentAddress, incoming.currentAddress),
+
+      // Combine arrays (deduplicate by value)
+      previousAddresses: this.mergeAddressArrays(
+        existing.previousAddresses,
+        incoming.previousAddresses
+      ),
+      accountNumbers: this.mergeArrayFields(existing.accountNumbers, incoming.accountNumbers),
+      loanNumbers: this.mergeArrayFields(existing.loanNumbers, incoming.loanNumbers),
+
+      // Combine document IDs (no duplicates)
+      documentIds: [...new Set([...existing.documentIds, ...incoming.documentIds])],
+
+      // Keep most recent timestamps
+      updatedAt: new Date()
+    };
+  }
+
+  /**
+   * Merge array fields, deduplicating by value
+   */
+  private mergeArrayFields<T extends { value: string | number }>(
+    arrA: T[] | undefined,
+    arrB: T[] | undefined
+  ): T[] | undefined {
+    if (!arrA && !arrB) return undefined;
+    if (!arrA) return arrB;
+    if (!arrB) return arrA;
+
+    const seen = new Set<string | number>();
+    const result: T[] = [];
+
+    for (const item of [...arrA, ...arrB]) {
+      if (!seen.has(item.value)) {
+        seen.add(item.value);
+        result.push(item);
+      }
+    }
+
+    return result.length > 0 ? result : undefined;
+  }
+
+  /**
+   * Merge address arrays (addresses are complex objects, so we use JSON stringify for deduplication)
+   */
+  private mergeAddressArrays<T>(arrA: T[] | undefined, arrB: T[] | undefined): T[] | undefined {
+    if (!arrA && !arrB) return undefined;
+    if (!arrA) return arrB;
+    if (!arrB) return arrA;
+
+    const seen = new Set<string>();
+    const result: T[] = [];
+
+    for (const item of [...arrA, ...arrB]) {
+      const key = JSON.stringify(item);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    }
+
+    return result.length > 0 ? result : undefined;
+  }
+
+  /**
    * Extract an ExtractedField from field rows
    */
   private extractField(

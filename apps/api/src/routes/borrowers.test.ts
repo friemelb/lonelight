@@ -338,4 +338,58 @@ describe('Borrowers Routes', () => {
       expect(fileNames).not.toContain('other.pdf');
     });
   });
+
+  describe('POST /api/borrowers/extract', () => {
+    it('should return 500 if OPENAI_API_KEY is missing', async () => {
+      // Mock config with empty API key
+      vi.doMock('@/config', () => ({
+        config: {
+          openai: {
+            apiKey: '',
+            model: 'gpt-4o-2024-11-20'
+          }
+        }
+      }));
+
+      // Re-import router with mocked config
+      vi.resetModules();
+      const { borrowersRouter: newRouter } = await import('./borrowers');
+      app = express();
+      app.use(express.json());
+      app.use('/api/borrowers', newRouter);
+
+      const response = await request(app).post('/api/borrowers/extract');
+
+      expect(response.status).toBe(500);
+      expect(response.body.error.message).toContain('OpenAI API key is not configured');
+    });
+
+    it('should return empty result when no documents exist', async () => {
+      // Mock config with valid API key
+      vi.doMock('@/config', () => ({
+        config: {
+          openai: {
+            apiKey: 'test-api-key',
+            model: 'gpt-4o-2024-11-20'
+          }
+        }
+      }));
+
+      // Re-import router
+      vi.resetModules();
+      const { getDatabase } = await import('@/database');
+      vi.mocked(getDatabase).mockReturnValue(db);
+      const { borrowersRouter: newRouter } = await import('./borrowers');
+      app = express();
+      app.use(express.json());
+      app.use('/api/borrowers', newRouter);
+
+      const response = await request(app).post('/api/borrowers/extract');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.borrowers).toHaveLength(0);
+      expect(response.body.data.stats.totalDocuments).toBe(0);
+    });
+  });
 });

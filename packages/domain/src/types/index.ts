@@ -4,3 +4,4 @@ export * from './document.types';
 export * from './borrower.types';
 export * from './income.types';
 export * from './metrics.types';
+export * from './extraction.types';
