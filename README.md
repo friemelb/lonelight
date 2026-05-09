@@ -257,6 +257,14 @@ This project uses Claude Code's multi-agent system:
 
 See `.claude/CLAUDE.md` for detailed project context.
 
+## Documentation
+
+- [Prompt Strategy](docs/PROMPT_STRATEGY.md) - LLM extraction prompt design,
+  chunking rationale, JSON / Zod validation strategy, retry behavior,
+  hallucination mitigation, source attribution, confidence scoring,
+  OpenAI model selection, trade-offs vs. traditional NLP, and known
+  limitations (with sample valid and invalid responses).
+
 ## License
 
 UNLICENSED - Private repository
