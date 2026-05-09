@@ -28,12 +28,20 @@ interface DocumentStore {
   setFilters: (filters: DocumentFilters) => void;
   resetFilters: () => void;
   clearError: () => void;
-  ingestDocuments: () => Promise<{
-    total: number;
-    successful: number;
-    failed: number;
-    errors: Array<{filename: string; error: string}>;
-  }>;
+  ingestDocuments: () => Promise<IngestRunResult>;
+}
+
+export interface IngestRunResult {
+  total: number;
+  successful: number;
+  failed: number;
+  parsed?: number;
+  parseFailed?: number;
+  totalChunks?: number;
+  borrowersExtracted?: number;
+  extractionSuccess?: boolean;
+  extractionError?: string;
+  errors: Array<{ filename: string; error: string }>;
 }
 
 export const useDocumentStore = create<DocumentStore>((set, get) => ({

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { FieldCorrection, ReviewAction, ReviewStatus, ExtractedField } from '@loanlens/domain';
 
 export class ReviewRepository {
@@ -16,7 +16,7 @@ export class ReviewRepository {
     correctionNote?: string
   ): Promise<FieldCorrection> {
     const correction: FieldCorrection = {
-      id: uuidv4(),
+      id: randomUUID(),
       borrowerId,
       fieldName,
       originalValue: originalField.value,
@@ -92,7 +92,7 @@ export class ReviewRepository {
     notes?: string
   ): Promise<ReviewAction> {
     const reviewAction: ReviewAction = {
-      id: uuidv4(),
+      id: randomUUID(),
       borrowerId,
       action,
       previousStatus,

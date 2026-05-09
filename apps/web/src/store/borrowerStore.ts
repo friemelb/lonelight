@@ -8,6 +8,15 @@ interface PaginationInfo {
   hasMore: boolean;
 }
 
+export interface ExtractionRunResult {
+  success: boolean;
+  borrowersExtracted: number;
+  totalDocuments: number;
+  totalChunks: number;
+  durationMs: number;
+  errors: Array<{ message: string; type: string }>;
+}
+
 interface BorrowerStore {
   // State
   borrowers: BorrowerRecord[];
@@ -15,6 +24,7 @@ interface BorrowerStore {
   pagination: PaginationInfo | null;
   searchQuery: string;
   isLoading: boolean;
+  isExtracting: boolean;
   error: string | null;
 
   // Actions
@@ -23,6 +33,7 @@ interface BorrowerStore {
   setSearchQuery: (query: string) => void;
   clearSearch: () => void;
   clearError: () => void;
+  extractBorrowers: () => Promise<ExtractionRunResult>;
 }
 
 export const useBorrowerStore = create<BorrowerStore>((set, get) => ({
@@ -32,6 +43,7 @@ export const useBorrowerStore = create<BorrowerStore>((set, get) => ({
   pagination: null,
   searchQuery: '',
   isLoading: false,
+  isExtracting: false,
   error: null,
 
   // Fetch borrowers with optional search and pagination
@@ -209,5 +221,48 @@ export const useBorrowerStore = create<BorrowerStore>((set, get) => ({
   // Clear error message
   clearError: () => {
     set({ error: null });
+  },
+
+  // Run LLM extraction across all ingested documents
+  extractBorrowers: async () => {
+    set({ isExtracting: true, error: null });
+
+    try {
+      const response = await fetch('/api/borrowers/extract', { method: 'POST' });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          data?.error?.message ||
+          data?.errors?.[0]?.message ||
+          `Extraction failed: ${response.statusText}`;
+        throw new Error(message);
+      }
+
+      const stats = data?.data?.stats ?? {
+        totalDocuments: 0,
+        totalChunks: 0,
+        borrowersExtracted: 0,
+        durationMs: 0
+      };
+
+      // Refresh borrower list so the table reflects newly-extracted borrowers
+      await get().fetchBorrowers(get().searchQuery, get().pagination?.limit ?? 50, 0);
+
+      set({ isExtracting: false });
+
+      return {
+        success: data?.success ?? true,
+        borrowersExtracted: stats.borrowersExtracted ?? 0,
+        totalDocuments: stats.totalDocuments ?? 0,
+        totalChunks: stats.totalChunks ?? 0,
+        durationMs: stats.durationMs ?? 0,
+        errors: Array.isArray(data?.errors) ? data.errors : []
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Extraction failed';
+      set({ error: message, isExtracting: false });
+      throw error;
+    }
   }
 }));

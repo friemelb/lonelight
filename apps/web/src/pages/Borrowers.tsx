@@ -18,9 +18,10 @@ import {
   Tooltip,
   TextField,
   InputAdornment,
-  Chip
+  Chip,
+  Button
 } from '@mui/material';
-import { Refresh, Search, Person, CheckCircle, Cancel, Edit, PendingActions } from '@mui/icons-material';
+import { Refresh, Search, Person, CheckCircle, Cancel, Edit, PendingActions, AutoAwesome } from '@mui/icons-material';
 import { useBorrowerStore } from '../store/borrowerStore';
 import { ReviewStatus } from '@loanlens/domain';
 
@@ -31,9 +32,11 @@ export function Borrowers() {
     pagination,
     searchQuery,
     isLoading,
+    isExtracting,
     error,
     fetchBorrowers,
-    clearError
+    clearError,
+    extractBorrowers
   } = useBorrowerStore();
 
   const [page, setPage] = useState(0);
@@ -172,9 +175,37 @@ export function Borrowers() {
             ) : borrowers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center">
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                    {localSearchQuery ? 'No borrowers found matching your search' : 'No borrowers found'}
-                  </Typography>
+                  <Stack alignItems="center" spacing={2} sx={{ py: 4 }}>
+                    {localSearchQuery ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No borrowers match &ldquo;{localSearchQuery}&rdquo;.
+                      </Typography>
+                    ) : (
+                      <>
+                        <Typography variant="body1" color="text.secondary">
+                          No borrowers extracted yet
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Run extraction to pull borrower data from ingested documents.
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<AutoAwesome />}
+                          disabled={isExtracting}
+                          onClick={async () => {
+                            try {
+                              await extractBorrowers();
+                            } catch {
+                              /* error already surfaced via store */
+                            }
+                          }}
+                        >
+                          {isExtracting ? 'Running extraction…' : 'Run Extraction'}
+                        </Button>
+                      </>
+                    )}
+                  </Stack>
                 </TableCell>
               </TableRow>
             ) : (
