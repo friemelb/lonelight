@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { config } from '@/config';
-import { initializeSchema } from './schema';
+import { initializeSchema, migrateToReviewWorkflow } from './schema';
 
 let db: Database.Database | null = null;
 
@@ -29,6 +29,9 @@ export function getDatabase(): Database.Database {
 
     // Initialize schema
     initializeSchema(db);
+
+    // Run migrations
+    migrateToReviewWorkflow(db);
 
     console.log(`✅ Database connected: ${dbPath}`);
   }
@@ -57,6 +60,7 @@ export function getTestDatabase(): Database.Database {
 
   testDb.pragma('foreign_keys = ON');
   initializeSchema(testDb);
+  migrateToReviewWorkflow(testDb);
 
   return testDb;
 }

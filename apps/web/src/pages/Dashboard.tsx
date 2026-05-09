@@ -204,6 +204,73 @@ export function Dashboard() {
             </Typography>
           </Paper>
         </Grid>
+
+        {/* Review Metrics Section Header */}
+        <Grid item xs={12}>
+          <Typography variant="h5" sx={{ mt: 2, mb: 1 }}>
+            Review Workflow Metrics
+          </Typography>
+        </Grid>
+
+        {/* Pending Reviews */}
+        <Grid item xs={12} md={6} lg={3}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Pending Reviews
+            </Typography>
+            <Typography variant="h3" color="warning.main">
+              {metrics?.reviewCounts.pendingReview ?? '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Awaiting review
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Approved Records */}
+        <Grid item xs={12} md={6} lg={3}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Approved Records
+            </Typography>
+            <Typography variant="h3" color="success.main">
+              {metrics?.reviewCounts.approved ?? '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Approved borrowers
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Rejected Records */}
+        <Grid item xs={12} md={6} lg={3}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Rejected Records
+            </Typography>
+            <Typography variant="h3" color="error.main">
+              {metrics?.reviewCounts.rejected ?? '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Rejected borrowers
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Corrected Records */}
+        <Grid item xs={12} md={6} lg={3}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Corrected Records
+            </Typography>
+            <Typography variant="h3" color="info.main">
+              {metrics?.reviewCounts.corrected ?? '-'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              With corrections
+            </Typography>
+          </Paper>
+        </Grid>
       </Grid>
 
       <Snackbar

@@ -5,6 +5,7 @@ import { Documents } from '@/pages/Documents';
 import { DocumentDetail } from '@/pages/DocumentDetail';
 import { Borrowers } from '@/pages/Borrowers';
 import { BorrowerDetail } from '@/pages/BorrowerDetail';
+import { ReviewQueue } from '@/pages/ReviewQueue';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/documents/:id" element={<DocumentDetail />} />
         <Route path="/borrowers" element={<Borrowers />} />
         <Route path="/borrowers/:id" element={<BorrowerDetail />} />
+        <Route path="/review-queue" element={<ReviewQueue />} />
       </Routes>
     </AppShell>
   );

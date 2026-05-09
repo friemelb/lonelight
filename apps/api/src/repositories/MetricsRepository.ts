@@ -3,7 +3,8 @@ import {
   ProcessingMetric,
   ExtractionAttempt,
   MetricsSummary,
-  ProcessingStatus
+  ProcessingStatus,
+  ReviewStatus
 } from '@loanlens/domain';
 
 export class MetricsRepository {
@@ -160,6 +161,38 @@ export class MetricsRepository {
     const recentRows = recentStmt.all() as any[];
     const recentMetrics = recentRows.map(row => this.rowToMetric(row));
 
+    // Get borrower counts by review status
+    const reviewStatusStmt = this.db.prepare(`
+      SELECT review_status, COUNT(*) as count
+      FROM borrowers
+      GROUP BY review_status
+    `);
+    const reviewStatusRows = reviewStatusStmt.all() as Array<{ review_status: string; count: number }>;
+
+    const reviewCounts = {
+      pendingReview: 0,
+      approved: 0,
+      rejected: 0,
+      corrected: 0
+    };
+
+    for (const row of reviewStatusRows) {
+      switch (row.review_status) {
+        case ReviewStatus.PENDING_REVIEW:
+          reviewCounts.pendingReview = row.count;
+          break;
+        case ReviewStatus.APPROVED:
+          reviewCounts.approved = row.count;
+          break;
+        case ReviewStatus.REJECTED:
+          reviewCounts.rejected = row.count;
+          break;
+        case ReviewStatus.CORRECTED:
+          reviewCounts.corrected = row.count;
+          break;
+      }
+    }
+
     return {
       totalDocuments,
       byStatus,
@@ -167,7 +200,8 @@ export class MetricsRepository {
       avgProcessingTimeMs,
       successRate: Math.round(successRate * 10) / 10, // Round to 1 decimal place
       recentErrorCount,
-      recentMetrics
+      recentMetrics,
+      reviewCounts
     };
   }
 

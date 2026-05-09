@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { BorrowerRecord, ExtractedField } from '@loanlens/domain';
+import { BorrowerRecord, ExtractedField, ReviewStatus, FieldCorrection } from '@loanlens/domain';
 import { IBorrowerRepository } from './interfaces/IBorrowerRepository';
 import { FindOptions } from './interfaces/IDocumentRepository';
 
@@ -8,16 +8,19 @@ export class BorrowerRepository implements IBorrowerRepository {
 
   async create(borrower: BorrowerRecord): Promise<void> {
     const transaction = this.db.transaction(() => {
-      // Insert borrower
+      // Insert borrower with review status
       const borrowerStmt = this.db.prepare(`
-        INSERT INTO borrowers (id, created_at, updated_at)
-        VALUES (?, ?, ?)
+        INSERT INTO borrowers (id, created_at, updated_at, review_status, reviewed_at, reviewer_notes)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
 
       borrowerStmt.run(
         borrower.id,
         borrower.createdAt.toISOString(),
-        borrower.updatedAt.toISOString()
+        borrower.updatedAt.toISOString(),
+        borrower.reviewStatus || ReviewStatus.PENDING_REVIEW,
+        borrower.reviewedAt ? borrower.reviewedAt.toISOString() : null,
+        borrower.reviewerNotes || null
       );
 
       // Insert all extracted fields
@@ -93,7 +96,10 @@ export class BorrowerRepository implements IBorrowerRepository {
       fullName: this.extractField(fieldRows, 'fullName')!,
       createdAt: new Date(borrowerRow.created_at),
       updatedAt: new Date(borrowerRow.updated_at),
-      documentIds: [] // TODO: Get from documents table
+      documentIds: [], // TODO: Get from documents table
+      reviewStatus: borrowerRow.review_status as ReviewStatus,
+      reviewedAt: borrowerRow.reviewed_at ? new Date(borrowerRow.reviewed_at) : undefined,
+      reviewerNotes: borrowerRow.reviewer_notes || undefined
     };
 
     // Add optional fields
@@ -424,5 +430,110 @@ export class BorrowerRepository implements IBorrowerRepository {
       extractedAt: row.extracted_at ? new Date(row.extracted_at) : undefined,
       notes: row.notes || undefined
     };
+  }
+
+  /**
+   * Update the review status of a borrower
+   */
+  async updateReviewStatus(
+    id: string,
+    status: ReviewStatus,
+    notes?: string
+  ): Promise<void> {
+    const stmt = this.db.prepare(`
+      UPDATE borrowers
+      SET review_status = ?,
+          reviewed_at = ?,
+          reviewer_notes = ?,
+          updated_at = ?
+      WHERE id = ?
+    `);
+
+    stmt.run(
+      status,
+      new Date().toISOString(),
+      notes || null,
+      new Date().toISOString(),
+      id
+    );
+  }
+
+  /**
+   * Find borrowers by review status with pagination
+   */
+  async findByReviewStatus(
+    status: ReviewStatus,
+    options: FindOptions = {}
+  ): Promise<BorrowerRecord[]> {
+    const limit = options.limit || 50;
+    const offset = options.offset || 0;
+    const sortBy = options.sortBy || 'updatedAt';
+    const sortOrder = options.sortOrder || 'desc';
+
+    // Map sortBy to actual column name
+    const sortColumn = sortBy === 'updatedAt' ? 'updated_at' : 'created_at';
+
+    const stmt = this.db.prepare(`
+      SELECT id FROM borrowers
+      WHERE review_status = ?
+      ORDER BY ${sortColumn} ${sortOrder.toUpperCase()}
+      LIMIT ? OFFSET ?
+    `);
+
+    const rows = stmt.all(status, limit, offset) as Array<{ id: string }>;
+
+    // Fetch full borrower records
+    const borrowers: BorrowerRecord[] = [];
+    for (const row of rows) {
+      const borrower = await this.findById(row.id);
+      if (borrower) {
+        borrowers.push(borrower);
+      }
+    }
+
+    return borrowers;
+  }
+
+  /**
+   * Get the history of corrections for a specific field
+   */
+  async getFieldHistory(
+    borrowerId: string,
+    fieldName: string
+  ): Promise<FieldCorrection[]> {
+    const stmt = this.db.prepare(`
+      SELECT * FROM field_corrections
+      WHERE borrower_id = ? AND field_name = ?
+      ORDER BY corrected_at DESC
+    `);
+
+    const rows = stmt.all(borrowerId, fieldName) as any[];
+
+    return rows.map(row => ({
+      id: row.id,
+      borrowerId: row.borrower_id,
+      fieldName: row.field_name,
+      originalValue: row.original_value,
+      correctedValue: row.corrected_value,
+      originalConfidence: row.original_confidence,
+      sourceDocumentId: row.source_document_id,
+      sourcePage: row.source_page,
+      originalEvidence: row.original_evidence,
+      correctionNote: row.correction_note || undefined,
+      correctedAt: new Date(row.corrected_at)
+    }));
+  }
+
+  /**
+   * Count borrowers by review status
+   */
+  async countByReviewStatus(status: ReviewStatus): Promise<number> {
+    const stmt = this.db.prepare(`
+      SELECT COUNT(*) as count FROM borrowers
+      WHERE review_status = ?
+    `);
+
+    const result = stmt.get(status) as { count: number };
+    return result.count;
   }
 }

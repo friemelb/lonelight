@@ -1,6 +1,16 @@
 import { IncomeHistoryItem } from './income.types';
 
 /**
+ * Review status for borrower records
+ */
+export enum ReviewStatus {
+  PENDING_REVIEW = 'pending_review',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  CORRECTED = 'corrected'
+}
+
+/**
  * An individual extracted data point with full source traceability
  */
 export interface ExtractedField<T = string> {
@@ -97,4 +107,77 @@ export interface BorrowerRecord {
 
   /** IDs of all documents associated with this borrower */
   documentIds: string[];
+
+  /** Review status of this borrower record */
+  reviewStatus: ReviewStatus;
+
+  /** When this borrower was reviewed (if applicable) */
+  reviewedAt?: Date;
+
+  /** Notes from the reviewer */
+  reviewerNotes?: string;
+}
+
+/**
+ * A historical correction made to an extracted field by a human reviewer
+ */
+export interface FieldCorrection {
+  /** Unique identifier for this correction */
+  id: string;
+
+  /** ID of the borrower this correction belongs to */
+  borrowerId: string;
+
+  /** Name of the field that was corrected */
+  fieldName: string;
+
+  /** Original AI-extracted value */
+  originalValue: string;
+
+  /** Human-corrected value */
+  correctedValue: string;
+
+  /** Confidence score of the original extraction */
+  originalConfidence: number;
+
+  /** Source document ID for the original extraction */
+  sourceDocumentId: string;
+
+  /** Source page number for the original extraction */
+  sourcePage: number;
+
+  /** Original evidence quote */
+  originalEvidence: string;
+
+  /** Note explaining why the correction was made */
+  correctionNote?: string;
+
+  /** When this correction was made */
+  correctedAt: Date;
+}
+
+/**
+ * Audit log entry for a review action
+ */
+export interface ReviewAction {
+  /** Unique identifier for this action */
+  id: string;
+
+  /** ID of the borrower this action was performed on */
+  borrowerId: string;
+
+  /** Type of action performed */
+  action: 'approved' | 'rejected' | 'corrected' | 'submitted_for_review';
+
+  /** Previous status before this action */
+  previousStatus: ReviewStatus;
+
+  /** New status after this action */
+  newStatus: ReviewStatus;
+
+  /** Notes or comments for this action */
+  notes?: string;
+
+  /** When this action occurred */
+  actionAt: Date;
 }

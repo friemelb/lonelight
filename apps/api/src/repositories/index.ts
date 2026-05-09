@@ -4,3 +4,4 @@ export * from './ChunkRepository';
 export * from './BorrowerRepository';
 export * from './ErrorRepository';
 export * from './MetricsRepository';
+export * from './ReviewRepository';

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -14,9 +14,18 @@ import {
   Chip,
   Button
 } from '@mui/material';
-import { ArrowBack, Refresh, Article } from '@mui/icons-material';
+import { ArrowBack, Refresh, Article, CheckCircle, Cancel, Edit, PendingActions } from '@mui/icons-material';
 import { useBorrowerStore } from '../store/borrowerStore';
 import { ExtractedFieldDisplay } from '../components/ExtractedFieldDisplay';
+import { ReviewActions } from '../components/ReviewActions';
+import { EditFieldDialog } from '../components/EditFieldDialog';
+import { ReviewStatus, ExtractedField } from '@loanlens/domain';
+
+interface EditingField {
+  fieldName: string;
+  fieldLabel: string;
+  field?: ExtractedField;
+}
 
 export function BorrowerDetail() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +37,10 @@ export function BorrowerDetail() {
     fetchBorrowerById,
     clearError
   } = useBorrowerStore();
+
+  // Edit field dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingField, setEditingField] = useState<EditingField | null>(null);
 
   // Fetch borrower on mount or when ID changes
   useEffect(() => {
@@ -124,6 +137,54 @@ export function BorrowerDetail() {
     return first || last || 'Unnamed Borrower';
   };
 
+  // Get review status display info
+  const getReviewStatusInfo = () => {
+    switch (selectedBorrower.reviewStatus) {
+      case ReviewStatus.APPROVED:
+        return { color: 'success' as const, icon: <CheckCircle />, label: 'Approved' };
+      case ReviewStatus.REJECTED:
+        return { color: 'error' as const, icon: <Cancel />, label: 'Rejected' };
+      case ReviewStatus.CORRECTED:
+        return { color: 'warning' as const, icon: <Edit />, label: 'Corrected' };
+      case ReviewStatus.PENDING_REVIEW:
+      default:
+        return { color: 'default' as const, icon: <PendingActions />, label: 'Pending Review' };
+    }
+  };
+
+  // Handle successful review action
+  const handleReviewSuccess = () => {
+    // Refresh the borrower data
+    if (id) {
+      fetchBorrowerById(id);
+    }
+  };
+
+  // Check if editing is allowed
+  const canEditFields = selectedBorrower &&
+    (selectedBorrower.reviewStatus === ReviewStatus.PENDING_REVIEW ||
+     selectedBorrower.reviewStatus === ReviewStatus.CORRECTED);
+
+  // Handle opening edit dialog
+  const handleOpenEdit = (fieldName: string, fieldLabel: string, field?: ExtractedField) => {
+    setEditingField({ fieldName, fieldLabel, field });
+    setEditDialogOpen(true);
+  };
+
+  // Handle closing edit dialog
+  const handleCloseEdit = () => {
+    setEditDialogOpen(false);
+    setEditingField(null);
+  };
+
+  // Handle successful field edit
+  const handleEditSuccess = () => {
+    // Refresh the borrower data
+    if (id) {
+      fetchBorrowerById(id);
+    }
+  };
+
   return (
     <Box>
       {/* Header */}
@@ -137,6 +198,12 @@ export function BorrowerDetail() {
           <Typography variant="h4">
             {getDisplayName()}
           </Typography>
+          <Chip
+            icon={getReviewStatusInfo().icon}
+            label={getReviewStatusInfo().label}
+            color={getReviewStatusInfo().color}
+            size="medium"
+          />
         </Stack>
         <Tooltip title="Refresh">
           <IconButton onClick={handleRefresh}>
@@ -159,6 +226,8 @@ export function BorrowerDetail() {
               label="Full Name"
               field={selectedBorrower.fullName}
               onViewSource={handleViewSource}
+              canEdit={!!canEditFields}
+              onEdit={() => handleOpenEdit('fullName', 'Full Name', selectedBorrower.fullName)}
             />
 
             {(selectedBorrower.firstName || selectedBorrower.lastName) && (
@@ -170,6 +239,8 @@ export function BorrowerDetail() {
                       label="First Name"
                       field={selectedBorrower.firstName}
                       onViewSource={handleViewSource}
+                      canEdit={!!canEditFields}
+                      onEdit={() => handleOpenEdit('firstName', 'First Name', selectedBorrower.firstName)}
                     />
                   </Grid>
                   <Grid item xs={6}>
@@ -177,6 +248,8 @@ export function BorrowerDetail() {
                       label="Last Name"
                       field={selectedBorrower.lastName}
                       onViewSource={handleViewSource}
+                      canEdit={!!canEditFields}
+                      onEdit={() => handleOpenEdit('lastName', 'Last Name', selectedBorrower.lastName)}
                     />
                   </Grid>
                 </Grid>
@@ -188,6 +261,8 @@ export function BorrowerDetail() {
               label="Date of Birth"
               field={selectedBorrower.dateOfBirth}
               onViewSource={handleViewSource}
+              canEdit={!!canEditFields}
+              onEdit={() => handleOpenEdit('dateOfBirth', 'Date of Birth', selectedBorrower.dateOfBirth)}
             />
 
             <Divider sx={{ my: 2 }} />
@@ -195,6 +270,8 @@ export function BorrowerDetail() {
               label="SSN"
               field={selectedBorrower.ssn}
               onViewSource={handleViewSource}
+              canEdit={!!canEditFields}
+              onEdit={() => handleOpenEdit('ssn', 'SSN', selectedBorrower.ssn)}
             />
           </Paper>
         </Grid>
@@ -211,6 +288,8 @@ export function BorrowerDetail() {
               label="Email"
               field={selectedBorrower.email}
               onViewSource={handleViewSource}
+              canEdit={!!canEditFields}
+              onEdit={() => handleOpenEdit('email', 'Email', selectedBorrower.email)}
             />
 
             <Divider sx={{ my: 2 }} />
@@ -218,6 +297,8 @@ export function BorrowerDetail() {
               label="Phone Number"
               field={selectedBorrower.phoneNumber}
               onViewSource={handleViewSource}
+              canEdit={!!canEditFields}
+              onEdit={() => handleOpenEdit('phoneNumber', 'Phone Number', selectedBorrower.phoneNumber)}
             />
 
             {selectedBorrower.alternatePhoneNumber && (
@@ -227,6 +308,8 @@ export function BorrowerDetail() {
                   label="Alternate Phone"
                   field={selectedBorrower.alternatePhoneNumber}
                   onViewSource={handleViewSource}
+                  canEdit={!!canEditFields}
+                  onEdit={() => handleOpenEdit('alternatePhoneNumber', 'Alternate Phone', selectedBorrower.alternatePhoneNumber)}
                 />
               </>
             )}
@@ -280,6 +363,69 @@ export function BorrowerDetail() {
           </Paper>
         </Grid>
 
+        {/* Review Actions */}
+        {(selectedBorrower.reviewStatus === ReviewStatus.PENDING_REVIEW ||
+          selectedBorrower.reviewStatus === ReviewStatus.CORRECTED) && (
+          <Grid item xs={12}>
+            <ReviewActions
+              borrowerId={selectedBorrower.id}
+              currentStatus={selectedBorrower.reviewStatus}
+              borrowerName={getDisplayName()}
+              onSuccess={handleReviewSuccess}
+            />
+          </Grid>
+        )}
+
+        {/* Review Information (for reviewed borrowers) */}
+        {(selectedBorrower.reviewStatus === ReviewStatus.APPROVED ||
+          selectedBorrower.reviewStatus === ReviewStatus.REJECTED) &&
+          selectedBorrower.reviewedAt && (
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Review Information
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Review Status
+                  </Typography>
+                  <Chip
+                    icon={getReviewStatusInfo().icon}
+                    label={getReviewStatusInfo().label}
+                    color={getReviewStatusInfo().color}
+                    sx={{ mt: 0.5 }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Reviewed At
+                  </Typography>
+                  <Typography variant="body1" sx={{ mt: 0.5 }}>
+                    {selectedBorrower.reviewedAt.toLocaleString()}
+                  </Typography>
+                </Grid>
+
+                {selectedBorrower.reviewerNotes && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      Reviewer Notes
+                    </Typography>
+                    <Paper variant="outlined" sx={{ p: 2, mt: 0.5, bgcolor: 'grey.50' }}>
+                      <Typography variant="body2">
+                        {selectedBorrower.reviewerNotes}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                )}
+              </Grid>
+            </Paper>
+          </Grid>
+        )}
+
         {/* Metadata */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
@@ -297,6 +443,19 @@ export function BorrowerDetail() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Edit Field Dialog */}
+      {editingField && selectedBorrower && (
+        <EditFieldDialog
+          open={editDialogOpen}
+          onClose={handleCloseEdit}
+          borrowerId={selectedBorrower.id}
+          fieldName={editingField.fieldName}
+          fieldLabel={editingField.fieldLabel}
+          field={editingField.field}
+          onSuccess={handleEditSuccess}
+        />
+      )}
     </Box>
   );
 }

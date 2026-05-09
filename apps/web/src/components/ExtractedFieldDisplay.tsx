@@ -12,7 +12,8 @@ import {
   Warning,
   Error as ErrorIcon,
   Info,
-  Article
+  Article,
+  Edit
 } from '@mui/icons-material';
 import type { ExtractedField } from '@loanlens/domain';
 
@@ -20,6 +21,8 @@ interface ExtractedFieldDisplayProps {
   label: string;
   field: ExtractedField<any> | undefined;
   onViewSource?: (documentId: string, page: number) => void;
+  onEdit?: () => void;
+  canEdit?: boolean;
 }
 
 /**
@@ -29,7 +32,9 @@ interface ExtractedFieldDisplayProps {
 export function ExtractedFieldDisplay({
   label,
   field,
-  onViewSource
+  onViewSource,
+  onEdit,
+  canEdit = false
 }: ExtractedFieldDisplayProps) {
   if (!field) {
     return (
@@ -86,6 +91,17 @@ export function ExtractedFieldDisplay({
         {field.notes && (
           <Tooltip title={field.notes}>
             <Info sx={{ fontSize: 16, color: 'text.secondary' }} />
+          </Tooltip>
+        )}
+        {canEdit && onEdit && (
+          <Tooltip title={`Edit ${label}`}>
+            <IconButton
+              size="small"
+              onClick={onEdit}
+              sx={{ p: 0.25, ml: 0.5 }}
+            >
+              <Edit sx={{ fontSize: 16 }} />
+            </IconButton>
           </Tooltip>
         )}
       </Stack>

@@ -109,4 +109,12 @@ export interface MetricsSummary {
 
   /** Most recent processing metrics */
   recentMetrics: ProcessingMetric[];
+
+  /** Review workflow counts */
+  reviewCounts: {
+    pendingReview: number;
+    approved: number;
+    rejected: number;
+    corrected: number;
+  };
 }

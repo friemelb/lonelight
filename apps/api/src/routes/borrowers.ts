@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { getDatabase } from '@/database';
-import { BorrowerRepository, DocumentRepository, ChunkRepository, MetricsRepository } from '@/repositories';
+import { BorrowerRepository, DocumentRepository, ChunkRepository, MetricsRepository, ReviewRepository } from '@/repositories';
 import { ExtractionService } from '@/services/ExtractionService';
 import { config } from '@/config';
 import { Logger } from '@/utils/logger';
-import { ProcessingStatus, BorrowerRecord } from '@loanlens/domain';
+import { ProcessingStatus, BorrowerRecord, ReviewStatus } from '@loanlens/domain';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Individual extraction error
@@ -94,6 +95,44 @@ borrowersRouter.get(
     }
   }
 );
+
+/**
+ * GET /api/borrowers/review-queue
+ * Get borrowers pending review (must be before /:id route to avoid conflict)
+ */
+borrowersRouter.get('/review-queue', async (req: Request, res: Response) => {
+  try {
+    const db = getDatabase();
+    const repository = new BorrowerRepository(db);
+
+    const options = {
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+      offset: req.query.offset ? parseInt(req.query.offset as string, 10) : 0,
+      sortBy: 'updatedAt' as const,
+      sortOrder: 'desc' as const
+    };
+
+    const borrowers = await repository.findByReviewStatus(
+      ReviewStatus.PENDING_REVIEW,
+      options
+    );
+
+    const total = await repository.countByReviewStatus(ReviewStatus.PENDING_REVIEW);
+
+    res.status(200).json({
+      data: borrowers,
+      pagination: {
+        total,
+        limit: options.limit,
+        offset: options.offset,
+        hasMore: options.offset + borrowers.length < total
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching review queue:', error);
+    throw error;
+  }
+});
 
 /**
  * GET /api/borrowers/:id
@@ -370,5 +409,207 @@ borrowersRouter.post('/extract', async (_req: Request, res: Response) => {
         timestamp: new Date().toISOString()
       }
     });
+  }
+});
+
+/**
+ * POST /api/borrowers/:id/review
+ * Review a borrower (approve or reject)
+ */
+borrowersRouter.post('/:id/review', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { action, notes } = req.body;
+
+    // Validate action
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({
+        error: {
+          message: 'Invalid action. Must be "approve" or "reject"',
+          statusCode: 400,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    const db = getDatabase();
+    const borrowerRepository = new BorrowerRepository(db);
+    const reviewRepository = new ReviewRepository(db);
+
+    // Get current borrower
+    const borrower = await borrowerRepository.findById(id);
+    if (!borrower) {
+      return res.status(404).json({
+        error: {
+          message: 'Borrower not found',
+          statusCode: 404,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    const previousStatus = borrower.reviewStatus;
+    const newStatus = action === 'approve' ? ReviewStatus.APPROVED : ReviewStatus.REJECTED;
+
+    // Update review status
+    await borrowerRepository.updateReviewStatus(id, newStatus, notes);
+
+    // Create audit log entry
+    await reviewRepository.createReviewAction(
+      id,
+      action === 'approve' ? 'approved' : 'rejected',
+      previousStatus,
+      newStatus,
+      notes
+    );
+
+    // Fetch updated borrower
+    const updatedBorrower = await borrowerRepository.findById(id);
+
+    return res.status(200).json({
+      success: true,
+      borrower: updatedBorrower
+    });
+  } catch (error) {
+    console.error('Error reviewing borrower:', error);
+    throw error;
+  }
+});
+
+/**
+ * PATCH /api/borrowers/:id/field
+ * Correct a specific field value
+ */
+borrowersRouter.patch('/:id/field', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { fieldName, correctedValue, correctionNote } = req.body;
+
+    // Validate request
+    if (!fieldName || correctedValue === undefined) {
+      return res.status(400).json({
+        error: {
+          message: 'fieldName and correctedValue are required',
+          statusCode: 400,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    const db = getDatabase();
+    const borrowerRepository = new BorrowerRepository(db);
+    const reviewRepository = new ReviewRepository(db);
+
+    // Get current borrower
+    const borrower = await borrowerRepository.findById(id);
+    if (!borrower) {
+      return res.status(404).json({
+        error: {
+          message: 'Borrower not found',
+          statusCode: 404,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    // Get the original field value
+    const originalField = (borrower as any)[fieldName];
+    if (!originalField) {
+      return res.status(400).json({
+        error: {
+          message: `Field '${fieldName}' not found on borrower`,
+          statusCode: 400,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    // Create field correction record
+    await reviewRepository.createFieldCorrection(
+      id,
+      fieldName,
+      originalField,
+      correctedValue,
+      correctionNote
+    );
+
+    // Update the borrower field
+    const updatedBorrower = { ...borrower };
+    (updatedBorrower as any)[fieldName] = {
+      ...originalField,
+      value: correctedValue
+    };
+
+    // Update borrower in database
+    await borrowerRepository.update(id, updatedBorrower);
+
+    // Update status to corrected if not already
+    const previousStatus = borrower.reviewStatus;
+    if (previousStatus !== ReviewStatus.CORRECTED) {
+      await borrowerRepository.updateReviewStatus(
+        id,
+        ReviewStatus.CORRECTED,
+        `Field '${fieldName}' corrected`
+      );
+
+      // Create audit log entry
+      await reviewRepository.createReviewAction(
+        id,
+        'corrected',
+        previousStatus,
+        ReviewStatus.CORRECTED,
+        `Field '${fieldName}' corrected`
+      );
+    }
+
+    // Fetch final updated borrower
+    const finalBorrower = await borrowerRepository.findById(id);
+
+    return res.status(200).json({
+      success: true,
+      borrower: finalBorrower
+    });
+  } catch (error) {
+    console.error('Error correcting field:', error);
+    throw error;
+  }
+});
+
+/**
+ * GET /api/borrowers/:id/audit-history
+ * Get audit history for a borrower
+ */
+borrowersRouter.get('/:id/audit-history', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const db = getDatabase();
+    const borrowerRepository = new BorrowerRepository(db);
+    const reviewRepository = new ReviewRepository(db);
+
+    // Verify borrower exists
+    const borrower = await borrowerRepository.findById(id);
+    if (!borrower) {
+      return res.status(404).json({
+        error: {
+          message: 'Borrower not found',
+          statusCode: 404,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    // Get audit history and corrections
+    const auditHistory = await reviewRepository.getAuditHistory(id);
+    const corrections = await reviewRepository.getCorrectionsForBorrower(id);
+
+    return res.status(200).json({
+      borrowerId: id,
+      auditHistory,
+      corrections
+    });
+  } catch (error) {
+    console.error('Error fetching audit history:', error);
+    throw error;
   }
 });

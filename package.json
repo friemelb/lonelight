@@ -36,6 +36,7 @@
   "author": "",
   "license": "UNLICENSED",
   "devDependencies": {
+    "@types/uuid": "^10.0.0",
     "docx": "^9.6.1",
     "husky": "^9.1.7"
   },

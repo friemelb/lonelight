@@ -17,6 +17,7 @@ import {
   Dashboard as DashboardIcon,
   Description as DocumentsIcon,
   People as BorrowersIcon,
+  RateReview as ReviewIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Documents', path: '/documents', icon: <DocumentsIcon /> },
   { label: 'Borrowers', path: '/borrowers', icon: <BorrowersIcon /> },
+  { label: 'Review Queue', path: '/review-queue', icon: <ReviewIcon /> },
 ];
 
 export function AppShell({ children }: AppShellProps) {

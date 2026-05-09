@@ -67,10 +67,14 @@ export function initializeSchema(db: Database.Database): void {
       CREATE TABLE borrowers (
         id TEXT PRIMARY KEY,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        review_status TEXT NOT NULL DEFAULT 'pending_review' CHECK(review_status IN ('pending_review', 'approved', 'rejected', 'corrected')),
+        reviewed_at TEXT,
+        reviewer_notes TEXT
       );
 
       CREATE INDEX idx_borrowers_updated_at ON borrowers(updated_at);
+      CREATE INDEX idx_borrowers_review_status ON borrowers(review_status);
     `);
 
     // 4. Borrower fields table (stores ExtractedField data)
@@ -165,6 +169,126 @@ export function initializeSchema(db: Database.Database): void {
       CREATE INDEX idx_attempts_started_at ON extraction_attempts(started_at);
     `);
 
+    // 8. Field corrections table (audit trail for human corrections)
+    db.exec(`
+      CREATE TABLE field_corrections (
+        id TEXT PRIMARY KEY,
+        borrower_id TEXT NOT NULL,
+        field_name TEXT NOT NULL,
+        original_value TEXT NOT NULL,
+        corrected_value TEXT NOT NULL,
+        original_confidence REAL NOT NULL,
+        source_document_id TEXT NOT NULL,
+        source_page INTEGER NOT NULL,
+        original_evidence TEXT NOT NULL,
+        correction_note TEXT,
+        corrected_at TEXT NOT NULL,
+        FOREIGN KEY (borrower_id) REFERENCES borrowers(id) ON DELETE CASCADE,
+        FOREIGN KEY (source_document_id) REFERENCES documents(id) ON DELETE RESTRICT
+      );
+
+      CREATE INDEX idx_corrections_borrower_id ON field_corrections(borrower_id);
+      CREATE INDEX idx_corrections_field_name ON field_corrections(borrower_id, field_name);
+      CREATE INDEX idx_corrections_corrected_at ON field_corrections(corrected_at);
+    `);
+
+    // 9. Borrower review audit table (action log)
+    db.exec(`
+      CREATE TABLE borrower_review_audit (
+        id TEXT PRIMARY KEY,
+        borrower_id TEXT NOT NULL,
+        action TEXT NOT NULL CHECK(action IN ('approved', 'rejected', 'corrected', 'submitted_for_review')),
+        previous_status TEXT NOT NULL,
+        new_status TEXT NOT NULL,
+        notes TEXT,
+        action_at TEXT NOT NULL,
+        FOREIGN KEY (borrower_id) REFERENCES borrowers(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_review_audit_borrower_id ON borrower_review_audit(borrower_id);
+      CREATE INDEX idx_review_audit_action_at ON borrower_review_audit(action_at);
+      CREATE INDEX idx_review_audit_action ON borrower_review_audit(action);
+    `);
+
     console.log('✅ Database schema initialized successfully');
+  })();
+}
+
+/**
+ * Migrate existing database to add review workflow support
+ * Adds review columns to borrowers table and creates new audit tables
+ */
+export function migrateToReviewWorkflow(db: Database.Database): void {
+  console.log('Checking if review workflow migration is needed...');
+
+  // Check if review_status column already exists
+  const tableInfo = db
+    .prepare("PRAGMA table_info(borrowers)")
+    .all() as Array<{ name: string }>;
+
+  const hasReviewStatus = tableInfo.some((col) => col.name === 'review_status');
+
+  if (hasReviewStatus) {
+    console.log('Review workflow already migrated');
+    return;
+  }
+
+  console.log('Migrating database to add review workflow support...');
+
+  db.transaction(() => {
+    // Add review columns to borrowers table
+    db.exec(`
+      ALTER TABLE borrowers ADD COLUMN review_status TEXT NOT NULL DEFAULT 'pending_review';
+      ALTER TABLE borrowers ADD COLUMN reviewed_at TEXT;
+      ALTER TABLE borrowers ADD COLUMN reviewer_notes TEXT;
+    `);
+
+    // Create index for review_status
+    db.exec(`
+      CREATE INDEX idx_borrowers_review_status ON borrowers(review_status);
+    `);
+
+    // Create field_corrections table
+    db.exec(`
+      CREATE TABLE field_corrections (
+        id TEXT PRIMARY KEY,
+        borrower_id TEXT NOT NULL,
+        field_name TEXT NOT NULL,
+        original_value TEXT NOT NULL,
+        corrected_value TEXT NOT NULL,
+        original_confidence REAL NOT NULL,
+        source_document_id TEXT NOT NULL,
+        source_page INTEGER NOT NULL,
+        original_evidence TEXT NOT NULL,
+        correction_note TEXT,
+        corrected_at TEXT NOT NULL,
+        FOREIGN KEY (borrower_id) REFERENCES borrowers(id) ON DELETE CASCADE,
+        FOREIGN KEY (source_document_id) REFERENCES documents(id) ON DELETE RESTRICT
+      );
+
+      CREATE INDEX idx_corrections_borrower_id ON field_corrections(borrower_id);
+      CREATE INDEX idx_corrections_field_name ON field_corrections(borrower_id, field_name);
+      CREATE INDEX idx_corrections_corrected_at ON field_corrections(corrected_at);
+    `);
+
+    // Create borrower_review_audit table
+    db.exec(`
+      CREATE TABLE borrower_review_audit (
+        id TEXT PRIMARY KEY,
+        borrower_id TEXT NOT NULL,
+        action TEXT NOT NULL CHECK(action IN ('approved', 'rejected', 'corrected', 'submitted_for_review')),
+        previous_status TEXT NOT NULL,
+        new_status TEXT NOT NULL,
+        notes TEXT,
+        action_at TEXT NOT NULL,
+        FOREIGN KEY (borrower_id) REFERENCES borrowers(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_review_audit_borrower_id ON borrower_review_audit(borrower_id);
+      CREATE INDEX idx_review_audit_action_at ON borrower_review_audit(action_at);
+      CREATE INDEX idx_review_audit_action ON borrower_review_audit(action);
+    `);
+
+    console.log('✅ Review workflow migration completed successfully');
   })();
 }
