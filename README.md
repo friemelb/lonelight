@@ -259,6 +259,11 @@ See `.claude/CLAUDE.md` for detailed project context.
 
 ## Documentation
 
+- [System Design](docs/SYSTEM_DESIGN.md) - Architecture overview, component
+  diagram, data pipeline, ingestion / parsing / extraction / storage /
+  retrieval strategies, document variability handling, scaling to 10x and
+  100x volume, technical trade-offs, error handling, validation and data
+  quality, observability, human review workflow, and future improvements.
 - [Prompt Strategy](docs/PROMPT_STRATEGY.md) - LLM extraction prompt design,
   chunking rationale, JSON / Zod validation strategy, retry behavior,
   hallucination mitigation, source attribution, confidence scoring,
