@@ -149,13 +149,18 @@ export function Documents() {
               <MenuItem value={ProcessingStatus.ERROR}>Error</MenuItem>
             </Select>
           </FormControl>
-          <Tooltip title="Run ingestion from corpus">
-            <IconButton onClick={handleIngestion} disabled={isLoading}>
-              <CloudUpload />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Refresh">
-            <IconButton onClick={handleRefresh} disabled={isLoading}>
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<CloudUpload />}
+            onClick={handleIngestion}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Running…' : 'Run Ingestion'}
+          </Button>
+          <Tooltip title="Refresh document list">
+            <IconButton onClick={handleRefresh} disabled={isLoading} aria-label="Refresh document list">
               <Refresh />
             </IconButton>
           </Tooltip>
@@ -198,9 +203,24 @@ export function Documents() {
             ) : documents.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} align="center">
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                    No documents found
-                  </Typography>
+                  <Stack alignItems="center" spacing={2} sx={{ py: 4 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      No documents yet
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Drop files into <code>apps/api/data/corpus/</code> and click
+                      <strong> Run Ingestion</strong> to scan and parse them.
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<CloudUpload />}
+                      onClick={handleIngestion}
+                      disabled={isLoading}
+                    >
+                      Run Ingestion
+                    </Button>
+                  </Stack>
                 </TableCell>
               </TableRow>
             ) : (
