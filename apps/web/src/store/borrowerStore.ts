@@ -48,6 +48,14 @@ export const DEFAULT_FILTERS: BorrowerFilters = {
   sourceDocumentId: 'ALL'
 };
 
+export interface ExtractRunResult {
+  success: boolean;
+  totalDocuments: number;
+  borrowersExtracted: number;
+  durationMs: number;
+  errors: Array<{ message: string; type?: string; documentId?: string }>;
+}
+
 interface BorrowerStore {
   borrowers: BorrowerRecord[];
   selectedBorrower: BorrowerRecord | null;
@@ -55,6 +63,7 @@ interface BorrowerStore {
   searchQuery: string;
   filters: BorrowerFilters;
   isLoading: boolean;
+  isExtracting: boolean;
   error: string | null;
 
   fetchBorrowers: (searchQuery?: string, limit?: number, offset?: number) => Promise<void>;
@@ -64,6 +73,7 @@ interface BorrowerStore {
   setFilters: (partial: Partial<BorrowerFilters>) => void;
   fetchFiltered: (limit?: number, offset?: number) => Promise<void>;
   resetFilters: () => void;
+  extractBorrowers: () => Promise<ExtractRunResult>;
   clearError: () => void;
 }
 
@@ -100,6 +110,7 @@ export const useBorrowerStore = create<BorrowerStore>((set, get) => ({
   searchQuery: '',
   filters: { ...DEFAULT_FILTERS },
   isLoading: false,
+  isExtracting: false,
   error: null,
 
   fetchBorrowers: async (searchQuery = '', limit = 50, offset = 0) => {
@@ -235,6 +246,45 @@ export const useBorrowerStore = create<BorrowerStore>((set, get) => ({
   resetFilters: () => {
     set({ filters: { ...DEFAULT_FILTERS } });
     get().fetchFiltered(50, 0);
+  },
+
+  extractBorrowers: async () => {
+    set({ isExtracting: true, error: null });
+
+    try {
+      const response = await fetch('/api/borrowers/extract', { method: 'POST' });
+      const data = await response.json();
+
+      if (!response.ok) {
+        const message =
+          data?.errors?.[0]?.message ||
+          data?.error?.message ||
+          `Extraction failed: ${response.statusText}`;
+        throw new Error(message);
+      }
+
+      const stats = data?.data?.stats ?? {};
+      const result: ExtractRunResult = {
+        success: Boolean(data?.success),
+        totalDocuments: stats.totalDocuments ?? 0,
+        borrowersExtracted: stats.borrowersExtracted ?? 0,
+        durationMs: stats.durationMs ?? 0,
+        errors: Array.isArray(data?.errors) ? data.errors : []
+      };
+
+      set({ isExtracting: false });
+
+      // Refresh the list so newly extracted borrowers appear.
+      get().fetchBorrowers('', 50, 0);
+
+      return result;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Extraction failed',
+        isExtracting: false
+      });
+      throw error;
+    }
   },
 
   clearError: () => {

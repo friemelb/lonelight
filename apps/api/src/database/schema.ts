@@ -13,11 +13,8 @@ export function initializeSchema(db: Database.Database): void {
     .get() as { count: number };
 
   if (tableCount.count > 0) {
-    console.log('Database schema already initialized');
     return;
   }
-
-  console.log('Initializing database schema...');
 
   // Run all CREATE TABLE statements in a transaction
   db.transaction(() => {
@@ -209,8 +206,6 @@ export function initializeSchema(db: Database.Database): void {
       CREATE INDEX idx_review_audit_action_at ON borrower_review_audit(action_at);
       CREATE INDEX idx_review_audit_action ON borrower_review_audit(action);
     `);
-
-    console.log('✅ Database schema initialized successfully');
   })();
 }
 
@@ -219,8 +214,6 @@ export function initializeSchema(db: Database.Database): void {
  * Adds review columns to borrowers table and creates new audit tables
  */
 export function migrateToReviewWorkflow(db: Database.Database): void {
-  console.log('Checking if review workflow migration is needed...');
-
   // Check if review_status column already exists
   const tableInfo = db
     .prepare("PRAGMA table_info(borrowers)")
@@ -229,11 +222,8 @@ export function migrateToReviewWorkflow(db: Database.Database): void {
   const hasReviewStatus = tableInfo.some((col) => col.name === 'review_status');
 
   if (hasReviewStatus) {
-    console.log('Review workflow already migrated');
     return;
   }
-
-  console.log('Migrating database to add review workflow support...');
 
   db.transaction(() => {
     // Add review columns to borrowers table
@@ -288,7 +278,5 @@ export function migrateToReviewWorkflow(db: Database.Database): void {
       CREATE INDEX idx_review_audit_action_at ON borrower_review_audit(action_at);
       CREATE INDEX idx_review_audit_action ON borrower_review_audit(action);
     `);
-
-    console.log('✅ Review workflow migration completed successfully');
   })();
 }

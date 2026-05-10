@@ -32,8 +32,6 @@ export function getDatabase(): Database.Database {
 
     // Run migrations
     migrateToReviewWorkflow(db);
-
-    console.log(`✅ Database connected: ${dbPath}`);
   }
 
   return db;
@@ -47,7 +45,6 @@ export function closeDatabase(): void {
   if (db) {
     db.close();
     db = null;
-    console.log('Database connection closed');
   }
 }
 

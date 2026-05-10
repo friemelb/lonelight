@@ -42,23 +42,15 @@ app.use('/api/search', searchRouter);
 app.use(errorHandler);
 
 // Initialize database
-console.log('🔌 Initializing database...');
 getDatabase();
 
 // Start server
-const server = app.listen(config.port, config.host, () => {
-  console.log(`🚀 API server running at http://${config.host}:${config.port}`);
-  console.log(`📝 Environment: ${config.nodeEnv}`);
-  console.log(`🔧 API Version: ${config.apiVersion}`);
-});
+const server = app.listen(config.port, config.host);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
   server.close(() => {
-    console.log('HTTP server closed');
     closeDatabase();
-    console.log('Database connection closed');
   });
 });
 
