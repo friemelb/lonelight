@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -18,10 +18,31 @@ import {
   Tooltip,
   TextField,
   InputAdornment,
-  Chip
+  Chip,
+  Slider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Autocomplete,
+  Button
 } from '@mui/material';
-import { Refresh, Search, Person, CheckCircle, Cancel, Edit, PendingActions } from '@mui/icons-material';
-import { useBorrowerStore } from '../store/borrowerStore';
+import {
+  Refresh,
+  Search,
+  Person,
+  CheckCircle,
+  Cancel,
+  Edit,
+  PendingActions,
+  RestartAlt
+} from '@mui/icons-material';
+import {
+  useBorrowerStore,
+  DEFAULT_FILTERS,
+  type SearchToken
+} from '../store/borrowerStore';
+import { useDocumentStore } from '../store/documentStore';
 import { ReviewStatus } from '@loanlens/domain';
 
 export function Borrowers() {
@@ -29,59 +50,65 @@ export function Borrowers() {
   const {
     borrowers,
     pagination,
-    searchQuery,
+    filters,
     isLoading,
     error,
-    fetchBorrowers,
+    fetchFiltered,
+    setFilters,
+    resetFilters,
     clearError
   } = useBorrowerStore();
 
+  const { documents, fetchDocuments } = useDocumentStore();
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
-  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState(filters.q);
 
-  // Initial fetch
+  // Initial fetch + load documents for the source-document filter.
   useEffect(() => {
-    fetchBorrowers('', rowsPerPage, 0);
+    fetchFiltered(rowsPerPage, 0);
+    if (documents.length === 0) {
+      fetchDocuments({}, 200, 0);
+    }
   }, []);
 
-  // Debounced search (300ms)
+  // Debounce the free-text search so we don't hammer the API on every keystroke.
   useEffect(() => {
+    if (searchInput === filters.q) return;
     const timer = setTimeout(() => {
-      if (localSearchQuery !== searchQuery) {
-        setPage(0);
-        fetchBorrowers(localSearchQuery, rowsPerPage, 0);
-      }
+      setPage(0);
+      setFilters({ q: searchInput });
     }, 300);
-
     return () => clearTimeout(timer);
-  }, [localSearchQuery]);
+  }, [searchInput]);
 
-  // Handle page change
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
-    fetchBorrowers(searchQuery, rowsPerPage, newPage * rowsPerPage);
+    fetchFiltered(rowsPerPage, newPage * rowsPerPage);
   };
 
-  // Handle rows per page change
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newRowsPerPage = parseInt(event.target.value, 10);
     setRowsPerPage(newRowsPerPage);
     setPage(0);
-    fetchBorrowers(searchQuery, newRowsPerPage, 0);
+    fetchFiltered(newRowsPerPage, 0);
   };
 
-  // Handle refresh
   const handleRefresh = () => {
-    fetchBorrowers(searchQuery, rowsPerPage, page * rowsPerPage);
+    fetchFiltered(rowsPerPage, page * rowsPerPage);
   };
 
-  // Handle row click - navigate to detail page
   const handleRowClick = (borrowerId: string) => {
     navigate(`/borrowers/${borrowerId}`);
   };
 
-  // Get display name from borrower
+  const handleResetFilters = () => {
+    setSearchInput('');
+    setPage(0);
+    resetFilters();
+  };
+
   const getDisplayName = (borrower: any) => {
     if (borrower.fullName?.value) {
       return borrower.fullName.value;
@@ -94,7 +121,6 @@ export function Borrowers() {
     return first || last || '—';
   };
 
-  // Get review status display info
   const getReviewStatusInfo = (status: ReviewStatus) => {
     switch (status) {
       case ReviewStatus.APPROVED:
@@ -109,26 +135,104 @@ export function Borrowers() {
     }
   };
 
+  const filtersAreDefault = useMemo(
+    () =>
+      filters.q === DEFAULT_FILTERS.q &&
+      filters.minConfidence === DEFAULT_FILTERS.minConfidence &&
+      filters.reviewStatus === DEFAULT_FILTERS.reviewStatus &&
+      filters.sourceDocumentId === DEFAULT_FILTERS.sourceDocumentId &&
+      filters.searchIn.length === 0,
+    [filters]
+  );
+
+  // Human-readable labels for the field-name tokens used by `?in=`.
+  const SEARCH_IN_OPTIONS: Array<{ value: SearchToken; label: string }> = [
+    { value: 'fullName', label: 'Full name' },
+    { value: 'firstName', label: 'First name' },
+    { value: 'middleName', label: 'Middle name' },
+    { value: 'lastName', label: 'Last name' },
+    { value: 'ssn', label: 'SSN' },
+    { value: 'dateOfBirth', label: 'Date of birth' },
+    { value: 'email', label: 'Email' },
+    { value: 'phoneNumber', label: 'Phone' },
+    { value: 'alternatePhoneNumber', label: 'Alternate phone' },
+    { value: 'currentAddress', label: 'Current address' },
+    { value: 'previousAddresses', label: 'Previous addresses' },
+    { value: 'accountNumbers', label: 'Account numbers' },
+    { value: 'loanNumbers', label: 'Loan numbers' },
+    { value: 'incomeHistory', label: 'Income history' },
+    { value: 'evidenceQuote', label: 'Evidence quotes' }
+  ];
+
+  const selectedSearchInOptions = useMemo(
+    () =>
+      filters.searchIn
+        .map((t) => SEARCH_IN_OPTIONS.find((o) => o.value === t))
+        .filter((o): o is { value: SearchToken; label: string } => Boolean(o)),
+    [filters.searchIn]
+  );
+
+  const handleSearchInChange = (
+    _event: React.SyntheticEvent,
+    next: Array<{ value: SearchToken; label: string }>
+  ) => {
+    setPage(0);
+    setFilters({ searchIn: next.map((o) => o.value) });
+  };
+
+  const documentOptions = useMemo(
+    () => [
+      { id: 'ALL', filename: 'All documents' },
+      ...documents.map((d) => ({ id: d.id, filename: d.filename }))
+    ],
+    [documents]
+  );
+
+  const selectedDocOption =
+    documentOptions.find((d) => d.id === filters.sourceDocumentId) ?? documentOptions[0];
+
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h4">
-          Borrowers
-        </Typography>
-        <Stack direction="row" spacing={2}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ mb: 3 }}
+      >
+        <Typography variant="h4">Borrowers</Typography>
+        <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             size="small"
             placeholder="Search borrowers..."
-            value={localSearchQuery}
-            onChange={(e) => setLocalSearchQuery(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
                   <Search fontSize="small" />
                 </InputAdornment>
-              ),
+              )
             }}
             sx={{ minWidth: 250 }}
+          />
+          <Autocomplete
+            multiple
+            size="small"
+            sx={{ minWidth: 280, maxWidth: 420 }}
+            options={SEARCH_IN_OPTIONS}
+            getOptionLabel={(option) => option.label}
+            isOptionEqualToValue={(o, v) => o.value === v.value}
+            value={selectedSearchInOptions}
+            onChange={handleSearchInChange}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Search in"
+                placeholder={
+                  filters.searchIn.length === 0 ? 'All field values' : ''
+                }
+              />
+            )}
           />
           <Tooltip title="Refresh">
             <IconButton onClick={handleRefresh} disabled={isLoading}>
@@ -137,6 +241,81 @@ export function Borrowers() {
           </Tooltip>
         </Stack>
       </Stack>
+
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={3}
+          alignItems={{ xs: 'stretch', md: 'center' }}
+        >
+          <Box sx={{ minWidth: 220, flex: 1 }}>
+            <Typography variant="caption" color="text.secondary" gutterBottom>
+              Min confidence (fullName): {filters.minConfidence.toFixed(2)}
+            </Typography>
+            <Slider
+              value={filters.minConfidence}
+              onChange={(_e, value) => {
+                setPage(0);
+                setFilters({ minConfidence: value as number });
+              }}
+              min={0}
+              max={1}
+              step={0.05}
+              marks={[
+                { value: 0, label: '0' },
+                { value: 0.5, label: '0.5' },
+                { value: 1, label: '1' }
+              ]}
+              size="small"
+            />
+          </Box>
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="review-status-label">Review status</InputLabel>
+            <Select
+              labelId="review-status-label"
+              label="Review status"
+              value={filters.reviewStatus}
+              onChange={(e) => {
+                setPage(0);
+                setFilters({
+                  reviewStatus: e.target.value as ReviewStatus | 'ALL'
+                });
+              }}
+            >
+              <MenuItem value="ALL">All statuses</MenuItem>
+              <MenuItem value={ReviewStatus.PENDING_REVIEW}>Pending</MenuItem>
+              <MenuItem value={ReviewStatus.APPROVED}>Approved</MenuItem>
+              <MenuItem value={ReviewStatus.REJECTED}>Rejected</MenuItem>
+              <MenuItem value={ReviewStatus.CORRECTED}>Corrected</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Autocomplete
+            size="small"
+            sx={{ minWidth: 260, flex: 1 }}
+            options={documentOptions}
+            getOptionLabel={(option) => option.filename}
+            isOptionEqualToValue={(o, v) => o.id === v.id}
+            value={selectedDocOption}
+            onChange={(_e, value) => {
+              setPage(0);
+              setFilters({ sourceDocumentId: value?.id ?? 'ALL' });
+            }}
+            renderInput={(params) => (
+              <TextField {...params} label="Source document" />
+            )}
+          />
+
+          <Button
+            startIcon={<RestartAlt />}
+            disabled={filtersAreDefault || isLoading}
+            onClick={handleResetFilters}
+          >
+            Reset
+          </Button>
+        </Stack>
+      </Paper>
 
       {error && (
         <Alert severity="error" onClose={clearError} sx={{ mb: 2 }}>
@@ -158,7 +337,6 @@ export function Borrowers() {
           </TableHead>
           <TableBody>
             {isLoading ? (
-              // Loading skeletons
               Array.from({ length: rowsPerPage }).map((_, index) => (
                 <TableRow key={index}>
                   <TableCell><Skeleton /></TableCell>
@@ -173,7 +351,9 @@ export function Borrowers() {
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                    {localSearchQuery ? 'No borrowers found matching your search' : 'No borrowers found'}
+                    {filtersAreDefault
+                      ? 'No borrowers found'
+                      : 'No borrowers match your search and filters'}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -211,9 +391,7 @@ export function Borrowers() {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>
-                    {borrower.updatedAt.toLocaleDateString()}
-                  </TableCell>
+                  <TableCell>{borrower.updatedAt.toLocaleDateString()}</TableCell>
                   <TableCell align="center">
                     <Chip
                       label={borrower.documentIds.length}

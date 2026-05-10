@@ -9,6 +9,7 @@ import { borrowersRouter } from '@/routes/borrowers';
 import { ingestRouter } from '@/routes/ingest';
 import { debugRouter } from '@/routes/debug';
 import { metricsRouter } from '@/routes/metrics';
+import { searchRouter } from '@/routes/search';
 import { errorHandler } from '@/middleware/errorHandler';
 import { requestLogger } from '@/middleware/requestLogger';
 
@@ -35,6 +36,7 @@ app.use('/api/borrowers', borrowersRouter);
 app.use('/api/ingest', ingestRouter);
 app.use('/api/debug', debugRouter);
 app.use('/api/metrics', metricsRouter);
+app.use('/api/search', searchRouter);
 
 // Error handling (must be last)
 app.use(errorHandler);

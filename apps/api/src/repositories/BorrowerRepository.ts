@@ -185,6 +185,113 @@ export class BorrowerRepository implements IBorrowerRepository {
     return borrowers;
   }
 
+  /**
+   * Search and filter borrowers. The free-text `q` is matched against the
+   * fields named in `searchIn`:
+   *   - Field-name tokens (e.g. `'fullName'`, `'lastName'`, `'accountNumbers'`)
+   *     restrict the LIKE to rows where `field_name` matches that token.
+   *   - The special `'evidenceQuote'` token also matches `evidence_quote`.
+   *   - An empty/omitted `searchIn` searches all `field_value` rows
+   *     (the original "any value" default).
+   *
+   * Confidence threshold is applied to the borrower's `fullName` field
+   * (the primary display field).
+   */
+  async searchAndFilter(opts: {
+    q?: string;
+    searchIn?: string[];
+    minConfidence?: number;
+    reviewStatus?: ReviewStatus;
+    sourceDocumentId?: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ borrowers: BorrowerRecord[]; total: number }> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (opts.q && opts.q.trim() !== '') {
+      const like = `%${opts.q.trim()}%`;
+      const tokens = opts.searchIn ?? [];
+
+      const fieldNames = tokens.filter((t) => t !== 'evidenceQuote');
+      const includeQuotes = tokens.includes('evidenceQuote');
+
+      const orClauses: string[] = [];
+
+      if (tokens.length === 0) {
+        // No narrowing: match every field_value row.
+        orClauses.push('bf.field_value LIKE ?');
+        params.push(like);
+      } else {
+        if (fieldNames.length > 0) {
+          const placeholders = fieldNames.map(() => '?').join(', ');
+          orClauses.push(
+            `(bf.field_name IN (${placeholders}) AND bf.field_value LIKE ?)`
+          );
+          params.push(...fieldNames, like);
+        }
+        if (includeQuotes) {
+          orClauses.push('bf.evidence_quote LIKE ?');
+          params.push(like);
+        }
+      }
+
+      if (orClauses.length > 0) {
+        conditions.push(`(${orClauses.join(' OR ')})`);
+      }
+    }
+
+    if (opts.sourceDocumentId) {
+      conditions.push('bf.source_document_id = ?');
+      params.push(opts.sourceDocumentId);
+    }
+
+    if (opts.reviewStatus) {
+      conditions.push('b.review_status = ?');
+      params.push(opts.reviewStatus);
+    }
+
+    if (typeof opts.minConfidence === 'number' && opts.minConfidence > 0) {
+      conditions.push(`b.id IN (
+        SELECT borrower_id FROM borrower_fields
+        WHERE field_name = 'fullName' AND confidence >= ?
+      )`);
+      params.push(opts.minConfidence);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const totalRow = this.db
+      .prepare(
+        `SELECT COUNT(DISTINCT b.id) AS count
+         FROM borrowers b
+         LEFT JOIN borrower_fields bf ON bf.borrower_id = b.id
+         ${whereClause}`
+      )
+      .get(...params) as { count: number };
+
+    const idRows = this.db
+      .prepare(
+        `SELECT DISTINCT b.id, b.updated_at
+         FROM borrowers b
+         LEFT JOIN borrower_fields bf ON bf.borrower_id = b.id
+         ${whereClause}
+         ORDER BY b.updated_at DESC
+         LIMIT ? OFFSET ?`
+      )
+      .all(...params, opts.limit, opts.offset) as Array<{ id: string }>;
+
+    const borrowers: BorrowerRecord[] = [];
+    for (const row of idRows) {
+      const borrower = await this.findById(row.id);
+      if (borrower) {
+        borrowers.push(borrower);
+      }
+    }
+
+    return { borrowers, total: totalRow.count };
+  }
+
   async count(): Promise<number> {
     const stmt = this.db.prepare('SELECT COUNT(*) as count FROM borrowers');
     const result = stmt.get() as { count: number };
